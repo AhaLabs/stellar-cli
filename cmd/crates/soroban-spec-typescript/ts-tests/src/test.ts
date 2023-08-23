@@ -1,11 +1,11 @@
 import test from 'ava'
 import { Contract, Ok, Err, networks } from 'test-custom-types'
 
-const rpcUrl = 'https://rpc-futurenet.stellar.org'
+const rpcUrl = 'http://localhost:8000/soroban/rpc'
 const publicKey = 'GCBVOLOM32I7OD5TWZQCIXCXML3TK56MDY7ZMTAILIBQHHKPCVU42XYW'
 
 const contract = new Contract({
-  ...networks[Object.keys(networks)[0] as keyof typeof networks],
+  ...networks.standalone,
   rpcUrl,
   wallet: {
     isConnected: () => Promise.resolve(true),
