@@ -3,3 +3,5 @@ target/
 !test.toml
 
 cmd/crates/soroban-spec-typescript/fixtures/ts/package-lock.json
+
+cmd/crates/soroban-spec-typescript/ts-tests/contract_id.txt

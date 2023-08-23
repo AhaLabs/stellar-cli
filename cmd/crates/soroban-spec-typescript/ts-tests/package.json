@@ -2,7 +2,10 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"postinstall": "curl -X POST \"http://localhost:8000/soroban/rpc\" && ./soroban config network add standalone --rpc-url \"http://localhost:8000/soroban/rpc\" --network-passphrase \"Standalone Network ; February 2017\" && ./soroban config identity fund --network standalone && export CONTRACT_ID=$(./soroban contract deploy --wasm ../../../../target/wasm32-unknown-unknown/test-wasms/test_custom_types.wasm --network standalone) && ./soroban contract bindings typescript --contract-id $CONTRACT_ID --network standalone --output-dir ./node_modules/test-custom-types --overwrite || { echo \"Make sure you're running standalone RPC network on localhost:8000\" && exit 1; }",
+		"postinstall": "curl -X POST \"http://localhost:8000/soroban/rpc\" && npm run fund  && npm run deploy && npm run bindings || { echo \"Make sure you're running standalone RPC network on localhost:8000\" && exit 1; }",
+		"fund": "./soroban config identity fund",
+		"bindings": "./soroban contract bindings typescript --contract-id $(cat contract_id.txt) --output-dir ./node_modules/test-custom-types --overwrite",
+		"deploy": "(./soroban contract deploy --wasm ../../../../target/wasm32-unknown-unknown/test-wasms/test_custom_types.wasm) > contract_id.txt",
 		"test": "ava"
 	},
 	"devDependencies": {
@@ -14,7 +17,7 @@
 	"ava": {
 		"typescript": {
 			"rewritePaths": {
-				"src/": "build/"
+				"tests/": "build/"
 			},
 			"compile": "tsc"
 		}
