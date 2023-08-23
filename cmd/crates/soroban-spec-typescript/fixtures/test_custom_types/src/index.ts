@@ -277,6 +277,7 @@ export class Contract {
             },
         });
         } catch (e) {
+            console.log(e)
             if (typeof e === 'string') {
                 let err = parseError(e);
                 if (err) return err;

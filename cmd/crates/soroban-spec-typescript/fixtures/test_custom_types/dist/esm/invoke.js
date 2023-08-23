@@ -35,7 +35,9 @@ export async function invoke({ method, args = [], fee = 100, responseType, parse
         .addOperation(contract.call(method, ...args))
         .setTimeout(SorobanClient.TimeoutInfinite)
         .build();
+    console.log(method, args);
     const simulated = await server.simulateTransaction(tx);
+    console.log("---\n", simulated.result.retval, "\n----");
     if (simulated.error)
         throw simulated.error;
     if (responseType === "simulated")
