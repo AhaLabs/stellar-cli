@@ -17,7 +17,7 @@
 	"ava": {
 		"typescript": {
 			"rewritePaths": {
-				"tests/": "build/"
+				"src/": "build/"
 			},
 			"compile": "tsc"
 		}
