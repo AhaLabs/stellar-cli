@@ -1,8 +1,7 @@
 import test from 'ava'
+import { publicKey, rpcUrl } from './const.js'
 import { Contract, Ok, Err, networks, Address } from 'test-custom-types'
 
-const rpcUrl = 'http://localhost:8000/soroban/rpc'
-const publicKey = 'GDIY6AQQ75WMD4W46EYB7O6UYMHOCGQHLAQGQTKHDX4J2DYQCHVCR4W4'
 const addr = Address.fromString(publicKey)
 
 const contract = new Contract({

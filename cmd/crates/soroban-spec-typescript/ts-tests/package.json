@@ -4,8 +4,12 @@
 	"scripts": {
 		"postinstall": "curl -X POST \"http://localhost:8000/soroban/rpc\" && npm run fund  && npm run deploy && npm run bindings || { echo \"Make sure you're running standalone RPC network on localhost:8000\" && exit 1; }",
 		"fund": "./soroban config identity fund",
-		"bindings": "./soroban contract bindings typescript --contract-id $(cat contract_id.txt) --output-dir ./node_modules/test-custom-types --overwrite",
-		"deploy": "(./soroban contract deploy --wasm ../../../../target/wasm32-unknown-unknown/test-wasms/test_custom_types.wasm) > contract_id.txt",
+		"bindings:custom-types": "./soroban contract bindings typescript --contract-id $(cat contract-id-custom-types.txt) --output-dir ./node_modules/test-custom-types --overwrite",
+		"bindings:hello-world": "./soroban contract bindings typescript --contract-id $(cat contract-id-hello-world.txt) --output-dir ./node_modules/test-hello-world --overwrite",
+    "bindings": "npm run bindings:custom-types && npm run bindings:hello-world",
+		"deploy:custom-types": "(./soroban contract deploy --wasm ../../../../target/wasm32-unknown-unknown/test-wasms/test_custom_types.wasm) > contract-id-custom-types.txt",
+		"deploy:hello-world": "(./soroban contract deploy --wasm ../../../../target/wasm32-unknown-unknown/test-wasms/test_hello_world.wasm) > contract-id-hello-world.txt",
+    "deploy": "npm run deploy:custom-types && npm run deploy:hello-world",
 		"test": "ava"
 	},
 	"devDependencies": {
