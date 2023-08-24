@@ -1,5 +1,6 @@
 import test from 'ava'
-import { publicKey, rpcUrl } from './const.js'
+import SorobanClient from 'soroban-client'
+import { publicKey, rpcUrl, secretKey } from './const.js'
 import { Address, Contract, networks } from 'test-hello-world'
 
 const addr = Address.fromString(publicKey)
@@ -11,11 +12,19 @@ const contract = new Contract({
     isConnected: () => Promise.resolve(true),
     isAllowed: () => Promise.resolve(true),
     getUserInfo: () => Promise.resolve({ publicKey }),
-    signTransaction: async (tx: string, opts?: {
+    signTransaction: async (tx: string, _opts?: {
       network?: string,
       networkPassphrase?: string,
       accountToSign?: string,
-    }) => tx,
+    }) => {
+      const t = SorobanClient.TransactionBuilder.fromXDR(
+        tx,
+        networks.standalone.networkPassphrase,
+      )
+      const keypair = SorobanClient.Keypair.fromSecret(secretKey)
+      t.sign(keypair)
+      return t.toXDR()
+    },
   },
 })
 
