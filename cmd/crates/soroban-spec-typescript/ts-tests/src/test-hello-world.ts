@@ -1,6 +1,8 @@
 import test from 'ava'
 import { publicKey, rpcUrl } from './const.js'
-import { Contract, networks } from 'test-hello-world'
+import { Address, Contract, networks } from 'test-hello-world'
+
+const addr = Address.fromString(publicKey)
 
 const contract = new Contract({
   ...networks.standalone,
@@ -19,6 +21,10 @@ const contract = new Contract({
 
 test('hello', async t => {
   t.deepEqual(await contract.hello({ world: 'tests' }), ['Hello', 'tests'])
+})
+
+test('auth', async t => {
+  t.is(await contract.auth({ addr, world: 'lol' }), addr)
 })
 
 test('inc', async t => {
