@@ -1,23 +1,10 @@
 import test from 'ava'
-import { publicKey, rpcUrl } from './const.js'
+import { publicKey, rpcUrl, wallet } from './util.js'
 import { Contract, Ok, Err, networks, Address } from 'test-custom-types'
 
 const addr = Address.fromString(publicKey)
 
-const contract = new Contract({
-  ...networks.standalone,
-  rpcUrl,
-  wallet: {
-    isConnected: () => Promise.resolve(true),
-    isAllowed: () => Promise.resolve(true),
-    getUserInfo: () => Promise.resolve({ publicKey }),
-    signTransaction: async (tx: string, opts?: {
-      network?: string,
-      networkPassphrase?: string,
-      accountToSign?: string,
-    }) => tx,
-  },
-})
+const contract = new Contract({ ...networks.standalone, rpcUrl, wallet});
 
 test('hello', async t => {
   t.is(await contract.hello({ hello: 'tests' }), 'tests')
