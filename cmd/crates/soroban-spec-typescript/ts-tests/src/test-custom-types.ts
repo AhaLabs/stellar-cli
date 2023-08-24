@@ -15,7 +15,7 @@ test('woid', async t => {
 })
 
 // Bug in soroban client, will be fixed in next release
-test.failing('u32_fail_on_even', async t => {
+test('u32_fail_on_even', async t => {
   t.deepEqual(await contract.u32FailOnEven({ u32_: 1 }), new Ok(1))
   t.deepEqual(await contract.u32FailOnEven({ u32_: 0 }), new Err({ message: "Please provide an odd number" }))
 })
