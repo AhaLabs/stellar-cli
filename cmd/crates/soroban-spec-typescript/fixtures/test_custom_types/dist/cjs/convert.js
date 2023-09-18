@@ -31,7 +31,7 @@ function scValToJs(val) {
         case soroban_client_1.xdr.ScValType.scvI128():
         case soroban_client_1.xdr.ScValType.scvU256():
         case soroban_client_1.xdr.ScValType.scvI256(): {
-            return soroban_client_1.scValToBigInt(val);
+            return (0, soroban_client_1.scValToBigInt)(val);
         }
         case soroban_client_1.xdr.ScValType.scvAddress(): {
             return soroban_client_1.Address.fromScVal(val).toString();
@@ -90,7 +90,7 @@ function scValToJs(val) {
 }
 exports.scValToJs = scValToJs;
 function addressToScVal(addr) {
-    return soroban_client_1.nativeToScVal(addr, { type: 'address' } /* bug workaround */);
+    return (0, soroban_client_1.nativeToScVal)(addr, { type: 'address' } /* bug workaround */);
 }
 exports.addressToScVal = addressToScVal;
 function i128ToScVal(i) {

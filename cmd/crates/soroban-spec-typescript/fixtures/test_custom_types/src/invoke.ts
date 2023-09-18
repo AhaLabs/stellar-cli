@@ -1,8 +1,5 @@
 import * as SorobanClient from "soroban-client";
-<<<<<<< HEAD
-=======
 import { SorobanRpc } from "soroban-client";
->>>>>>> main
 import type {
   Account,
   Memo,
@@ -40,15 +37,9 @@ async function getAccount(
 
 export class NotImplementedError extends Error {}
 
-<<<<<<< HEAD
-type Simulation = SorobanClient.SorobanRpc.SimulateTransactionResponse;
-type SendTx = SorobanClient.SorobanRpc.SendTransactionResponse;
-type GetTx = SorobanClient.SorobanRpc.GetTransactionResponse;
-=======
 type Simulation = SorobanRpc.SimulateTransactionResponse;
 type SendTx = SorobanRpc.SendTransactionResponse;
 type GetTx = SorobanRpc.GetTransactionResponse;
->>>>>>> main
 
 // defined this way so typeahead shows full union, not named alias
 let someRpcResponse: Simulation | SendTx | GetTx;
@@ -91,11 +82,7 @@ export async function invoke<R extends ResponseTypes, T = string>({
   contractId,
   wallet,
 }: InvokeArgs<R, T>): Promise<T | string | SomeRpcResponse> {
-<<<<<<< HEAD
-  wallet = wallet ?? (await import("@stellar/freighter-api")).default;
-=======
   wallet = wallet ?? (await import("@stellar/freighter-api"));
->>>>>>> main
   let parse = parseResultXdr;
   const server = new SorobanClient.Server(rpcUrl, {
     allowHttp: rpcUrl.startsWith("http://"),
@@ -116,41 +103,11 @@ export async function invoke<R extends ResponseTypes, T = string>({
     fee: fee.toString(10),
     networkPassphrase,
   })
-    .setNetworkPassphrase(networkPassphrase)
     .addOperation(contract.call(method, ...args))
     .setTimeout(SorobanClient.TimeoutInfinite)
     .build();
   const simulated = await server.simulateTransaction(tx);
 
-<<<<<<< HEAD
-  if (simulated.error) throw simulated.error;
-  if (responseType === "simulated") return simulated;
-
-  // is it possible for `auths` to be present but empty? Probably not, but let's be safe.
-  let authsCount = simulated.result!.auth?.length ?? 0;
-
-  const writeLength = simulated.transactionData
-    .build()
-    .resources()
-    .footprint()
-    .readWrite().length;
-
-  const isViewCall = authsCount === 0 && writeLength === 0;
-
-  if (isViewCall) {
-    if (responseType === "full") return simulated;
-
-    const retval = simulated.result?.retval;
-    if (!retval) {
-      if (simulated.error) {
-        throw new Error(simulated.error as unknown as string);
-      }
-      throw new Error(
-        `Invalid response from simulateTransaction:\n{simulated}`
-      );
-    }
-    return parseResultXdr(retval);
-=======
   if (SorobanRpc.isSimulationError(simulated)) {
     throw new Error(simulated.error);
   } else if (responseType === "simulated") {
@@ -169,7 +126,6 @@ export async function invoke<R extends ResponseTypes, T = string>({
     }
 
     return parseResultXdr(simulated.result.retval);
->>>>>>> main
   }
 
   if (authsCount > 1) {
@@ -197,9 +153,9 @@ export async function invoke<R extends ResponseTypes, T = string>({
   );
 
   const raw = await sendTx(tx, secondsToWait, server);
-<<<<<<< HEAD
-
-  if (responseType === "full") return raw;
+  if (responseType === "full") {
+    return raw;
+  }
 
   // if `sendTx` awaited the inclusion of the tx in the ledger, it used
   // `getTransaction`, which has a `returnValue` field
@@ -207,29 +163,6 @@ export async function invoke<R extends ResponseTypes, T = string>({
 
   // otherwise, it returned the result of `sendTransaction`
   if ("errorResultXdr" in raw) return parse(raw.errorResultXdr!);
-=======
-  if (responseType === "full") {
-    return raw;
-  }
-
-  // if `sendTx` awaited the inclusion of the tx in the ledger, it used
-  // `getTransaction`, which has a `resultXdr` field
-  if ("resultXdr" in raw) {
-    const getResult = raw as SorobanRpc.GetTransactionResponse;
-    if (getResult.status !== SorobanRpc.GetTransactionStatus.SUCCESS) {
-      console.error('Transaction submission failed! Returning full RPC response.');
-      return raw;
-    }
-
-    return parse(raw.resultXdr.result().toXDR("base64"));
-  }
-
-  // otherwise, it returned the result of `sendTransaction`
-  if ("errorResultXdr" in raw) {
-    const sendResult = raw as SorobanRpc.SendTransactionResponse;
-    return parse(sendResult.errorResultXdr);
-  }
->>>>>>> main
 
   // if neither of these are present, something went wrong
   console.error("Don't know how to parse result! Returning full RPC response.");
@@ -291,11 +224,7 @@ export async function sendTx(
 
   while (
     Date.now() < waitUntil &&
-<<<<<<< HEAD
-    getTransactionResponse.status === "NOT_FOUND"
-=======
     getTransactionResponse.status === SorobanRpc.GetTransactionStatus.NOT_FOUND
->>>>>>> main
   ) {
     // Wait a beat
     await new Promise((resolve) => setTimeout(resolve, waitTime));
@@ -307,11 +236,6 @@ export async function sendTx(
     );
   }
 
-<<<<<<< HEAD
-  if (getTransactionResponse.status === "NOT_FOUND") {
-    console.error(
-      `Waited ${secondsToWait} seconds for transaction to complete, but it did not. Returning anyway. Check the transaction status manually. Info: ${JSON.stringify(
-=======
   if (getTransactionResponse.status === SorobanRpc.GetTransactionStatus.NOT_FOUND) {
     console.error(
       `Waited ${
@@ -319,7 +243,6 @@ export async function sendTx(
       } seconds for transaction to complete, but it did not. ` +
       `Returning anyway. Check the transaction status manually. ` +
       `Info: ${JSON.stringify(
->>>>>>> main
         sendTransactionResponse,
         null,
         2

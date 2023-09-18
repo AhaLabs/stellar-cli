@@ -161,9 +161,6 @@ export async function invoke<R extends ResponseTypes, T = string>({
   // `getTransaction`, which has a `returnValue` field
   if ("returnValue" in raw) return parse(raw.returnValue!);
 
-    return parse(raw.resultXdr.result().toXDR("base64"));
-  }
-
   // otherwise, it returned the result of `sendTransaction`
   if ("errorResultXdr" in raw) return parse(raw.errorResultXdr!);
 
