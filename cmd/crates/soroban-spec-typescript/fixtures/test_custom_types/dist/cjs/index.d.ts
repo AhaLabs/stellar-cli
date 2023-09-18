@@ -48,8 +48,8 @@ export declare const networks: {
     };
 };
 /**
- * This is from the rust doc above the struct Test
- */
+     * This is from the rust doc above the struct Test
+     */
 export interface Test {
     a: u32;
     b: boolean;

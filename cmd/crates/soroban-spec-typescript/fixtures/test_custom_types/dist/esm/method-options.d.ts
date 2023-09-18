@@ -13,7 +13,11 @@ export interface Wallet {
         accountToSign?: string;
     }) => Promise<XDR_BASE64>;
 }
+<<<<<<< HEAD
+export type ClassOptions = {
+=======
 export declare type ClassOptions = {
+>>>>>>> main
     contractId: string;
     networkPassphrase: string;
     rpcUrl: string;
@@ -32,7 +36,11 @@ export declare type ClassOptions = {
      */
     wallet?: Wallet;
 };
+<<<<<<< HEAD
+export type MethodOptions<R extends ResponseTypes> = {
+=======
 export declare type MethodOptions<R extends ResponseTypes> = {
+>>>>>>> main
     /**
      * The fee to pay for the transaction. Default: 100.
      */
