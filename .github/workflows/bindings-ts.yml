@@ -1,6 +1,10 @@
+
 name: bindings typescript
 
-on: [push]
+on:
+  push:
+    branches: [main, release/**]
+  pull_request:
 
 jobs:
   test:
@@ -8,7 +12,7 @@ jobs:
     runs-on: ubuntu-20.04
     services:
       rpc:
-        image: stellar/quickstart:soroban-dev@sha256:a6b03cf6b0433c99f2f799b719f0faadbb79684b1b763e7674ba749fb0f648ee
+        image: stellar/quickstart:soroban-dev@sha256:8a99332f834ca82e3ac1418143736af59b5288e792d1c4278d6c547c6ed8da3b
         ports:
           - 8000:8000
         env:
