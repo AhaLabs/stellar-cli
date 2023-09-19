@@ -2,8 +2,6 @@ import test from 'ava'
 import { publicKey, rpcUrl, wallet } from './util.js'
 import { Contract, Ok, Err, networks, Address } from 'test-custom-types'
 
-const addr = Address.fromString(publicKey)
-
 const contract = new Contract({ ...networks.standalone, rpcUrl, wallet});
 
 test('hello', async t => {
@@ -76,8 +74,8 @@ test('complex with enum', async t => {
 })
 
 test('complex with asset', async t => {
-  const arg = { tag: 'Asset', values: [addr, 1n] } as const
-  const ret = { tag: 'Asset', values: [addr, 1n] }
+  const arg = { tag: 'Asset', values: [publicKey, 1n] } as const
+  const ret = { tag: 'Asset', values: [publicKey, 1n] }
   t.deepEqual(await contract.complex({ complex: arg }), ret)
 })
 
@@ -87,7 +85,7 @@ test('complex with void', async t => {
 })
 
 test('addresse', async t => {
-  t.deepEqual(await contract.addresse({ addresse: addr }), addr)
+  t.deepEqual(await contract.addresse({ addresse: publicKey }), Address.fromString(publicKey))
 })
 
 test('bytes', async t => {

@@ -254,7 +254,7 @@ export class Contract {
     addresse = async ({ addresse }, options = {}) => {
         return await invoke({
             method: 'addresse',
-            args: this.spec.funcArgsToScVals("addresse", { addresse }),
+            args: this.spec.funcArgsToScVals("addresse", { addresse: new Address(addresse) }),
             ...options,
             ...this.options,
             parseResultXdr: (xdr) => {

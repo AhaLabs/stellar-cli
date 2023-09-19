@@ -2,8 +2,6 @@ import test from "ava";
 import { wallet, publicKey, rpcUrl } from "./util.js";
 import { Address, Contract, networks } from "test-hello-world";
 
-const addr = Address.fromString(publicKey);
-
 const contract = new Contract({...networks.standalone, rpcUrl, wallet});
 
 test("hello", async (t) => {
@@ -12,7 +10,7 @@ test("hello", async (t) => {
 
 // Currently must run tests in serial because nonce logic not smart enough to handle concurrent calls.
 test.serial("auth", async (t) => {
-  t.deepEqual(await contract.auth({ addr, world: 'lol' }), addr)
+  t.deepEqual(await contract.auth({ addr: publicKey, world: 'lol' }), Address.fromString(publicKey))
 });
 
 test.serial("inc", async (t) => {
