@@ -1,5 +1,5 @@
 [package]
-name = "soroban-cli"
+name = "loam-soroban-cli"
 description = "Soroban CLI"
 homepage = "https://github.com/stellar/soroban-cli"
 repository = "https://github.com/stellar/soroban-cli"
