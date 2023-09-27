@@ -17,7 +17,7 @@ jobs:
           - 8000:8000
         env:
           ENABLE_LOGS: true
-          NETWORK: standalone
+          NETWORK: local
           ENABLE_SOROBAN_RPC: true
         options: >-
           --health-cmd "curl -X POST \"http://localhost:8000/soroban/rpc\""
