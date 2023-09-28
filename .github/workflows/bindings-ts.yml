@@ -40,6 +40,9 @@ jobs:
     - run: cargo build
     - run: rustup target add wasm32-unknown-unknown
     - run: make build-test-wasms
-    - run: curl "http://localhost:8000/friendbot?addr=$(soroban config identity address)"
+    - run: curl "http://localhost:8000/friendbot?addr=$(./soroban config identity address)"
+      working-directory: cmd/crates/soroban-spec-typescript/ts-tests
+    - run: ./soroban config identity fund
+      working-directory: cmd/crates/soroban-spec-typescript/ts-tests
     - run: npm ci && npm run test
       working-directory: cmd/crates/soroban-spec-typescript/ts-tests
