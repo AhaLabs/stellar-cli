@@ -25,6 +25,11 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
+    - run: curl -X POST "http://localhost:8000/soroban/rpc"
+    - run: curl "http://localhost:8000/friendbot?addr=$(./soroban config identity address)"
+      working-directory: cmd/crates/soroban-spec-typescript/ts-tests
+    - run: ./soroban config identity fund --network standalone
+      working-directory: cmd/crates/soroban-spec-typescript/ts-tests
     - run: echo $CARGO_TARGET_DIR
     - uses: actions/checkout@v3
     - uses: actions/cache@v3
@@ -41,8 +46,5 @@ jobs:
     - run: rustup target add wasm32-unknown-unknown
     - run: make build-test-wasms
     - run: curl "http://localhost:8000/friendbot?addr=$(./soroban config identity address)"
-      working-directory: cmd/crates/soroban-spec-typescript/ts-tests
-    - run: ./soroban config identity fund
-      working-directory: cmd/crates/soroban-spec-typescript/ts-tests
     - run: npm ci && npm run test
       working-directory: cmd/crates/soroban-spec-typescript/ts-tests
