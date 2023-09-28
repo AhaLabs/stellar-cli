@@ -20,7 +20,7 @@ jobs:
           NETWORK: local
           ENABLE_SOROBAN_RPC: true
         options: >-
-          --health-cmd "curl -X POST \"http://localhost:8000/soroban/rpc\""
+          --health-cmd "curl \"http://localhost:8000/friendbot\""
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
