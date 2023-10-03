@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     name: test generated libraries
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     services:
       rpc:
         image: stellar/quickstart:testing@sha256:40636cdb1b9168b47e5dc120949fe3610ff914e8dd43409edb6fa66496bdd9c3
@@ -20,15 +20,15 @@ jobs:
           NETWORK: local
           ENABLE_SOROBAN_RPC: true
         options: >-
-          --health-cmd "curl \"http://localhost:8000/friendbot\""
+          --health-cmd "curl --no-progress-meter --fail-with-body \"http://localhost:8000/friendbot\""
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     steps:
     - run: echo $CARGO_TARGET_DIR
     - uses: actions/checkout@v3
-    - run: curl -X POST "http://localhost:8000/soroban/rpc"
-    - run: curl "http://localhost:8000/friendbot?addr=$(./soroban config identity address)"
+    - run: curl --no-progress-meter --fail-with-body -X POST "http://localhost:8000/soroban/rpc"
+    - run: curl --no-progress-meter --fail-with-body "http://localhost:8000/friendbot?addr=$(./soroban config identity address)"
       working-directory: cmd/crates/soroban-spec-typescript/ts-tests
     - run: ./soroban config identity fund --network standalone
       working-directory: cmd/crates/soroban-spec-typescript/ts-tests
