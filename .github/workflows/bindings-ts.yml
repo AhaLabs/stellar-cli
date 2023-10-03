@@ -20,14 +20,14 @@ jobs:
           NETWORK: local
           ENABLE_SOROBAN_RPC: true
         options: >-
-          --health-cmd "curl --no-progress-meter --fail-with-body \"http://localhost:8000/friendbot\""
+          --health-cmd "curl --fail-with-body -X POST \"http://localhost:8000/soroban/rpc\" -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":8675309,\"method\":\"getNetwork\"}'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
     steps:
     - run: echo $CARGO_TARGET_DIR
     - uses: actions/checkout@v3
-    - run: curl --no-progress-meter --fail-with-body -X POST "http://localhost:8000/soroban/rpc"
+    - run: "curl --fail-with-body -X POST \"http://localhost:8000/soroban/rpc\" -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":8675309,\"method\":\"getNetwork\"}'"
     - run: curl --no-progress-meter --fail-with-body "http://localhost:8000/friendbot?addr=$(./soroban config identity address)"
       working-directory: cmd/crates/soroban-spec-typescript/ts-tests
     - run: ./soroban config identity fund --network standalone
