@@ -47,23 +47,38 @@ func TestCLICargoTest(t *testing.T) {
 func TestCLIWrapCustom(t *testing.T) {
 	NewCLITest(t)
 	testAccount := getCLIDefaultAccount(t)
-	strkeyContractID := runSuccessfulCLICmd(t, fmt.Sprintf("lab token wrap --asset=deadbeef:%s", testAccount))
-	require.Equal(t, "true", runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id=%s -- authorized --id=%s", strkeyContractID, testAccount)))
-	runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id=%s -- mint --to=%s --amount 1", strkeyContractID, testAccount))
+	strkeyContractID := runSuccessfulSorobanCmd(t, fmt.Sprintf("lab token wrap --asset=deadbeef:%s", testAccount))
+	require.Equal(t, "true", runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id=%s -- authorized --id=%s", strkeyContractID, testAccount)))
+	runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id=%s -- mint --to=%s --amount 1", strkeyContractID, testAccount))
+}
+
+func TestTypeScriptBindings(t *testing.T) {
+  NewCLITest(t)
+  testDir := "../../../crates/soroban-spec-typescript/ts-tests"
+  rpcUrl := fmt.Sprintf("SOROBAN_RPC_URL=http://localhost:%d/", sorobanRPCPort)
+  networkPassphrase := fmt.Sprintf("SOROBAN_NETWORK_PASSPHRASE=%s", StandaloneNetworkPassphrase)
+  install := newCommand(t, "npm i")
+  test := newCommand(t, "npm run test")
+  install.Dir = testDir
+  test.Dir = testDir
+	install.Env = append(os.Environ(), rpcUrl, networkPassphrase)
+	test.Env = append(os.Environ(), rpcUrl, networkPassphrase)
+  runSuccessfulCmd(t, install)
+  runSuccessfulCmd(t, test)
 }
 
 func TestCLIWrapNative(t *testing.T) {
 	NewCLITest(t)
 	testAccount := getCLIDefaultAccount(t)
-	strkeyContractID := runSuccessfulCLICmd(t, fmt.Sprintf("lab token wrap --asset=native:%s", testAccount))
+	strkeyContractID := runSuccessfulSorobanCmd(t, fmt.Sprintf("lab token wrap --asset=native:%s", testAccount))
 	require.Equal(t, "CAMTHSPKXZJIRTUXQP5QWJIFH3XIDMKLFAWVQOFOXPTKAW5GKV37ZC4N", strkeyContractID)
-	require.Equal(t, "true", runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id=%s -- authorized --id=%s", strkeyContractID, testAccount)))
-	require.Equal(t, "\"9223372036854775807\"", runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id=%s -- balance --id %s", strkeyContractID, testAccount)))
+	require.Equal(t, "true", runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id=%s -- authorized --id=%s", strkeyContractID, testAccount)))
+	require.Equal(t, "\"9223372036854775807\"", runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id=%s -- balance --id %s", strkeyContractID, testAccount)))
 }
 
 func TestCLIContractInstall(t *testing.T) {
 	NewCLITest(t)
-	output := runSuccessfulCLICmd(t, "contract install --wasm "+helloWorldContractPath)
+	output := runSuccessfulSorobanCmd(t, "contract install --wasm "+helloWorldContractPath)
 	wasm := getHelloWorldContract(t)
 	contractHash := xdr.Hash(sha256.Sum256(wasm))
 	require.Contains(t, output, contractHash.HexString())
@@ -71,16 +86,16 @@ func TestCLIContractInstall(t *testing.T) {
 
 func TestCLIContractInstallAndDeploy(t *testing.T) {
 	NewCLITest(t)
-	runSuccessfulCLICmd(t, "contract install --wasm "+helloWorldContractPath)
+	runSuccessfulSorobanCmd(t, "contract install --wasm "+helloWorldContractPath)
 	wasm := getHelloWorldContract(t)
 	contractHash := xdr.Hash(sha256.Sum256(wasm))
-	output := runSuccessfulCLICmd(t, fmt.Sprintf("contract deploy --salt %s --wasm-hash %s", hex.EncodeToString(testSalt[:]), contractHash.HexString()))
+	output := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract deploy --salt %s --wasm-hash %s", hex.EncodeToString(testSalt[:]), contractHash.HexString()))
 	outputsContractIDInLastLine(t, output)
 }
 
 func TestCLIContractDeploy(t *testing.T) {
 	NewCLITest(t)
-	output := runSuccessfulCLICmd(t, fmt.Sprintf("contract deploy --salt %s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
+	output := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract deploy --salt %s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
 	outputsContractIDInLastLine(t, output)
 }
 
@@ -100,17 +115,17 @@ func outputsContractIDInLastLine(t *testing.T, output string) {
 
 func TestCLIContractDeployAndInvoke(t *testing.T) {
 	NewCLITest(t)
-	contractID := runSuccessfulCLICmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
-	output := runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id %s -- hello --world=world", contractID))
+	contractID := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
+	output := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id %s -- hello --world=world", contractID))
 	require.Contains(t, output, `["Hello","world"]`)
 }
 
 func TestCLIRestorePreamble(t *testing.T) {
 	test := NewCLITest(t)
-	strkeyContractID := runSuccessfulCLICmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
-	count := runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
+	strkeyContractID := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
+	count := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
 	require.Equal(t, "1", count)
-	count = runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
+	count = runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
 	require.Equal(t, "2", count)
 
 	// Wait for the counter ledger entry to expire and successfully invoke the `inc` contract function again
@@ -119,14 +134,14 @@ func TestCLIRestorePreamble(t *testing.T) {
 	client := jrpc2.NewClient(ch, nil)
 	waitForLedgerEntryToExpire(t, client, getExpirationKeyForCounterLedgerEntry(t, strkeyContractID))
 
-	count = runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
+	count = runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
 	require.Equal(t, "3", count)
 }
 
 func TestCLIBump(t *testing.T) {
 	test := NewCLITest(t)
-	strkeyContractID := runSuccessfulCLICmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
-	count := runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
+	strkeyContractID := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
+	count := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
 	require.Equal(t, "1", count)
 
 	ch := jhttp.NewChannel(test.sorobanRPCURL(), nil)
@@ -135,7 +150,7 @@ func TestCLIBump(t *testing.T) {
 	expirationKey := getExpirationKeyForCounterLedgerEntry(t, strkeyContractID)
 	initialExpirationSeq := getExpirationForLedgerEntry(t, client, expirationKey)
 
-	bumpOutput := runSuccessfulCLICmd(
+	bumpOutput := runSuccessfulSorobanCmd(
 		t,
 		fmt.Sprintf(
 			"contract bump --id %s --key COUNTER --durability persistent --ledgers-to-expire 20",
@@ -149,8 +164,8 @@ func TestCLIBump(t *testing.T) {
 }
 func TestCLIBumpTooLow(t *testing.T) {
 	test := NewCLITest(t)
-	strkeyContractID := runSuccessfulCLICmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
-	count := runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
+	strkeyContractID := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
+	count := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
 	require.Equal(t, "1", count)
 
 	ch := jhttp.NewChannel(test.sorobanRPCURL(), nil)
@@ -171,8 +186,8 @@ func TestCLIBumpTooLow(t *testing.T) {
 
 func TestCLIBumpTooHigh(t *testing.T) {
 	test := NewCLITest(t)
-	strkeyContractID := runSuccessfulCLICmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
-	count := runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
+	strkeyContractID := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
+	count := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
 	require.Equal(t, "1", count)
 
 	ch := jhttp.NewChannel(test.sorobanRPCURL(), nil)
@@ -190,8 +205,8 @@ func TestCLIBumpTooHigh(t *testing.T) {
 
 func TestCLIRestore(t *testing.T) {
 	test := NewCLITest(t)
-	strkeyContractID := runSuccessfulCLICmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
-	count := runSuccessfulCLICmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
+	strkeyContractID := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract deploy --salt=%s --wasm %s", hex.EncodeToString(testSalt[:]), helloWorldContractPath))
+	count := runSuccessfulSorobanCmd(t, fmt.Sprintf("contract invoke --id %s -- inc", strkeyContractID))
 	require.Equal(t, "1", count)
 
 	ch := jhttp.NewChannel(test.sorobanRPCURL(), nil)
@@ -203,7 +218,7 @@ func TestCLIRestore(t *testing.T) {
 	// This ensures that the CLI restores the entry (using the RestorePreamble in the simulateTransaction response)
 	waitForLedgerEntryToExpire(t, client, expirationKey)
 
-	restoreOutput := runSuccessfulCLICmd(
+	restoreOutput := runSuccessfulSorobanCmd(
 		t,
 		fmt.Sprintf(
 			"contract restore --id %s --key COUNTER --durability persistent",
@@ -228,8 +243,13 @@ func parseContractStrKey(t *testing.T, strkeyContractID string) [32]byte {
 	return contractID
 }
 
-func runSuccessfulCLICmd(t *testing.T, cmd string) string {
-	res := runCLICommand(t, cmd)
+func runSuccessfulSorobanCmd(t *testing.T, cmdStr string) string {
+	cmd := newSorobanCommand(t, cmdStr)
+  return runSuccessfulCmd(t, cmd)
+}
+
+func runSuccessfulCmd(t *testing.T, cmd icmd.Cmd) string {
+  res := icmd.RunCmd(cmd)
 	stdout, stderr := res.Stdout(), res.Stderr()
 	outputs := fmt.Sprintf("stderr:\n%s\nstdout:\n%s\n", stderr, stdout)
 	require.NoError(t, res.Error, outputs)
@@ -237,7 +257,7 @@ func runSuccessfulCLICmd(t *testing.T, cmd string) string {
 	return strings.TrimSpace(stdout)
 }
 
-func runCLICommand(t *testing.T, cmd string) *icmd.Result {
+func newSorobanCommand(t *testing.T, cmd string) icmd.Cmd {
 	args := []string{"run", "-q", "--", "--vv"}
 	parsedArgs, err := shlex.Split(cmd)
 	require.NoError(t, err, cmd)
@@ -247,16 +267,22 @@ func runCLICommand(t *testing.T, cmd string) *icmd.Result {
 		fmt.Sprintf("SOROBAN_RPC_URL=http://localhost:%d/", sorobanRPCPort),
 		fmt.Sprintf("SOROBAN_NETWORK_PASSPHRASE=%s", StandaloneNetworkPassphrase),
 	)
-	return icmd.RunCmd(c)
+  return c
+}
+
+func newCommand(t *testing.T, cmd string) icmd.Cmd {
+	args, err := shlex.Split(cmd)
+	require.NoError(t, err, cmd)
+  return icmd.Command(args[0], args[1:]...)
 }
 
 func getCLIDefaultAccount(t *testing.T) string {
-	return runSuccessfulCLICmd(t, "config identity address --hd-path 0")
+	return runSuccessfulSorobanCmd(t, "config identity address --hd-path 0")
 }
 
 func NewCLITest(t *testing.T) *Test {
 	test := NewTest(t)
-	fundAccount(t, test, getCLIDefaultAccount(t), "1000000")
+	fundAccount(t, test, getCLIDefaultAccount(t), "10000000000")
 	return test
 }
 
@@ -294,7 +320,7 @@ func parseInt(t *testing.T, s string) uint64 {
 
 func bump(t *testing.T, contractId string, amount string, rest string) uint64 {
 
-	res := runSuccessfulCLICmd(
+	res := runSuccessfulSorobanCmd(
 		t,
 		fmt.Sprintf(
 			"contract bump --expiration-ledger-only --id=%s --durability persistent --ledgers-to-expire=%s %s",
