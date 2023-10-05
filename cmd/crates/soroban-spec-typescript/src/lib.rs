@@ -219,10 +219,8 @@ pub fn entry_to_ts(entry: &Entry) -> String {
                     r#"try {{
             {body}
         }} catch (e) {{
-            if (typeof e === 'string') {{
-                let err = parseError(e);
-                if (err) return err;
-            }}
+            let err = parseError(e.toString());
+            if (err) return err;
             throw e;
         }}"#
                 );

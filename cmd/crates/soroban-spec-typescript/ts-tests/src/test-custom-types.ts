@@ -75,7 +75,7 @@ test('complex with enum', async t => {
 
 test('complex with asset', async t => {
   const arg = { tag: 'Asset', values: [publicKey, 1n] } as const
-  const ret = { tag: 'Asset', values: [publicKey, 1n] }
+  const ret = { tag: 'Asset', values: [new Address(publicKey), 1n] }
   t.deepEqual(await contract.complex({ complex: arg }), ret)
 })
 
