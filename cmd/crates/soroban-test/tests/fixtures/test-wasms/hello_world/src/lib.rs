@@ -32,7 +32,7 @@ impl Contract {
 
     // get current count
     pub fn get_count(env: Env) -> u32 {
-        env.storage().temporary().get(&COUNTER).unwrap_or(0)
+        env.storage().persistent().get(&COUNTER).unwrap_or(0)
     }
 
     // increment count and return new one
