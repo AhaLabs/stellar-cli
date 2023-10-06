@@ -2,7 +2,7 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"postinstall": "curl -X POST ${SOROBAN_RPC_URL:-\"http://localhost:8000/soroban/rpc\"} && echo \"make sure you run 'npm run fund'\"  && npm run deploy && npm run bindings || { echo \"Make sure you're running standalone RPC network on localhost:8000\" && exit 1; }",
+		"postinstall": "curl -X POST ${SOROBAN_RPC_URL:-\"http://localhost:8000/\"} && echo \"make sure you first run 'SOROBAN_NETWORK_PASSPHRASE=\"Standalone Network ; February 2017\" SOROBAN_RPC_URL=http://localhost:8000/soroban/rpc npm run fund'\"  && npm run deploy && npm run bindings || { echo \"Make sure you're running standalone RPC network on localhost:8000\" && exit 1; }",
 		"fund": "./soroban config identity fund",
 		"bindings:custom-types": "./soroban contract bindings typescript --contract-id $(cat contract-id-custom-types.txt) --output-dir ./node_modules/test-custom-types --overwrite",
 		"bindings:hello-world": "./soroban contract bindings typescript --contract-id $(cat contract-id-hello-world.txt) --output-dir ./node_modules/test-hello-world --overwrite",

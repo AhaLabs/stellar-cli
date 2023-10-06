@@ -1,6 +1,6 @@
 import { Keypair, TransactionBuilder } from "soroban-client";
 
-export const rpcUrl = "http://localhost:8000";
+export const rpcUrl = process.env.SOROBAN_RPC_URL ?? "http://localhost:8000/";
 export const secretKey =
   "SC36BWNUOCZAO7DMEJNNKFV6BOTPJP7IG5PSHLUOLT6DZFRU3D3XGIXW";
 
