@@ -7,12 +7,21 @@ on:
   pull_request:
 
 jobs:
+  publish-docker:
+    concurrency:
+      group: docker-publish-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/publish-docker-container
+
   test:
+    needs: publish-docker
     name: test generated libraries
     runs-on: ubuntu-22.04
     services:
       rpc:
-        image: stellar/quickstart:testing@sha256:6377ce642644e06e42444d2b00a8ce52eee7529f5a5f1d02cb64a29f88f05bfa
+        image: stellar/quickstart:testing@sha256:${{needs.publish-docker.outputs.hash}}
         ports:
           - 8000:8000
         env:
