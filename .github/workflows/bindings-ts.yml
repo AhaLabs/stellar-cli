@@ -1,0 +1,50 @@
+
+name: bindings typescript
+
+on:
+  push:
+    branches: [main, release/**]
+  pull_request:
+
+jobs:
+  test:
+    name: test generated libraries
+    runs-on: ubuntu-22.04
+    services:
+      rpc:
+        image: stellar/quickstart:testing@sha256:c1030a6ee75c31ba6807b8feddded2af23789b5f2c9be3ac55a550630a35ef42
+        ports:
+          - 8000:8000
+        env:
+          ENABLE_LOGS: true
+          NETWORK: local
+          ENABLE_SOROBAN_RPC: true
+        options: >-
+          --health-cmd "curl --no-progress-meter --fail-with-body -X POST \"http://localhost:8000/soroban/rpc\" -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":8675309,\"method\":\"getNetwork\"}' && curl --no-progress-meter \"http://localhost:8000/friendbot\" | grep '\"invalid_field\": \"addr\"'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 50
+    steps:
+    - run: echo $CARGO_TARGET_DIR
+    - uses: actions/checkout@v3
+    - run: "curl --fail-with-body -X POST \"http://localhost:8000/soroban/rpc\" -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":8675309,\"method\":\"getNetwork\"}'"
+    - run: curl --no-progress-meter "http://localhost:8000/friendbot?addr=$(./soroban config identity address)"
+      working-directory: cmd/crates/soroban-spec-typescript/ts-tests
+    - run: ./soroban config identity fund --network standalone
+      working-directory: cmd/crates/soroban-spec-typescript/ts-tests
+    - uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - run: rustup update
+    - run: cargo build
+    - run: rustup target add wasm32-unknown-unknown
+    - run: make build-test-wasms
+    - run: curl "http://localhost:8000/friendbot?addr=$(./soroban config identity address)"
+    - run: npm ci && npm run test
+      working-directory: cmd/crates/soroban-spec-typescript/ts-tests
