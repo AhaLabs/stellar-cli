@@ -47,6 +47,11 @@ version = "20.0.0-rc2"
 git = "https://github.com/stellar/rs-soroban-sdk"
 rev = "0992413f9b05e5bfb1f872bce99e89d9129b2e61"
 
+[workspace.dependencies.soroban-token-sdk]
+version = "20.0.0-rc2"
+git = "https://github.com/stellar/rs-soroban-sdk"
+rev = "0992413f9b05e5bfb1f872bce99e89d9129b2e61"
+
 [workspace.dependencies.soroban-ledger-snapshot]
 version = "20.0.0-rc2"
 git = "https://github.com/stellar/rs-soroban-sdk"

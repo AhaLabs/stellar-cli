@@ -13,6 +13,7 @@ import type {
   MethodOptions,
   ResponseTypes,
   Wallet,
+  XDR_BASE64,
 } from "./method-options.js";
 
 export type Tx = Transaction<Memo<MemoType>, Operation[]>;
@@ -35,15 +36,11 @@ async function getAccount(
   return await server.getAccount(publicKey);
 }
 
-export class NotImplementedError extends Error {}
+export class NotImplementedError extends Error { }
 
-type Simulation = SorobanRpc.SimulateTransactionResponse;
+type Simulation = SorobanRpc.SimulateTransactionSuccessResponse;
 type SendTx = SorobanRpc.SendTransactionResponse;
 type GetTx = SorobanRpc.GetTransactionResponse;
-
-// defined this way so typeahead shows full union, not named alias
-let someRpcResponse: Simulation | SendTx | GetTx;
-type SomeRpcResponse = typeof someRpcResponse;
 
 type InvokeArgs<R extends ResponseTypes, T = string> = MethodOptions<R> &
   ClassOptions & {
@@ -62,13 +59,14 @@ type InvokeArgs<R extends ResponseTypes, T = string> = MethodOptions<R> &
 export async function invoke<R extends ResponseTypes = undefined, T = string>(
   args: InvokeArgs<R, T>
 ): Promise<
-  R extends undefined
-    ? T
-    : R extends "simulated"
-    ? Simulation
-    : R extends "full"
-    ? SomeRpcResponse
-    : T
+  R extends "simulated"
+  ? { txUnsigned: XDR_BASE64, simulation: Simulation }
+  : R extends "full"
+  // might be a read/view call, which means `txSigned`, `sendTx` and `getTx` will all be unnecessary
+  ? { txUnsigned: XDR_BASE64, simulation: Simulation, txSigned?: XDR_BASE64, sendTransactionResponse?: SendTx, getTransactionResponse?: GetTx, getTransactionResponseAll?: GetTx[] }
+  : R extends undefined
+  ? { txUnsigned: XDR_BASE64, simulation: Simulation, txSigned?: XDR_BASE64, sendTransactionResponse?: SendTx, getTransactionResponse?: GetTx, getTransactionResponseAll?: GetTx[], result: T }
+  : { txUnsigned: XDR_BASE64, simulation: Simulation, txSigned?: XDR_BASE64, sendTransactionResponse?: SendTx, getTransactionResponse?: GetTx, getTransactionResponseAll?: GetTx[], result: T }
 >;
 export async function invoke<R extends ResponseTypes, T = string>({
   method,
@@ -81,7 +79,7 @@ export async function invoke<R extends ResponseTypes, T = string>({
   networkPassphrase,
   contractId,
   wallet,
-}: InvokeArgs<R, T>): Promise<T | string | SomeRpcResponse> {
+}: InvokeArgs<R, T>): Promise<{ txUnsigned: XDR_BASE64, txSigned?: XDR_BASE64, simulation: Simulation, result?: T, sendTransactionResponse?: SendTx, getTransactionResponse?: GetTx, getTransactionResponseAll?: GetTx[] }> {
   wallet = wallet ?? (await import("@stellar/freighter-api"));
   let parse = parseResultXdr;
   const server = new SorobanClient.Server(rpcUrl, {
@@ -99,33 +97,39 @@ export async function invoke<R extends ResponseTypes, T = string>({
 
   const contract = new SorobanClient.Contract(contractId);
 
-  let tx = new SorobanClient.TransactionBuilder(account, {
+  let txUnsigned = new SorobanClient.TransactionBuilder(account, {
     fee: fee.toString(10),
     networkPassphrase,
   })
     .addOperation(contract.call(method, ...args))
     .setTimeout(SorobanClient.TimeoutInfinite)
     .build();
-  const simulated = await server.simulateTransaction(tx);
+  const simulation = await server.simulateTransaction(txUnsigned);
+  txUnsigned = SorobanClient.assembleTransaction(txUnsigned, networkPassphrase, simulation).build()
 
-  if (SorobanRpc.isSimulationError(simulated)) {
-    throw new Error(simulated.error);
+  if (SorobanRpc.isSimulationError(simulation)) {
+    throw new Error(simulation.error);
+  } else if (SorobanRpc.isSimulationRestore(simulation)) {
+    console.error('got \'restore\' response for simulation:', simulation);
+    throw new NotImplementedError("Simulation restore not yet supported");
   } else if (responseType === "simulated") {
-    return simulated;
-  } else if (!simulated.result) {
-    throw new Error(`invalid simulation: no result in ${simulated}`);
+    return { txUnsigned: txUnsigned.toXDR(), simulation };
+  } else if (!simulation.result) {
+    throw new Error(`invalid simulation: no result in ${simulation}`);
   }
 
-  let authsCount = simulated.result.auth.length;
-  const writeLength = simulated.transactionData.getReadWrite().length;
+  let authsCount = simulation.result.auth.length;
+  const writeLength = simulation.transactionData.getReadWrite().length;
   const isViewCall = (authsCount === 0) && (writeLength === 0);
 
   if (isViewCall) {
-    if (responseType === "full") {
-      return simulated;
-    }
+    if (responseType === "full") return { txUnsigned: txUnsigned.toXDR(), simulation };
 
-    return parseResultXdr(simulated.result.retval);
+    return {
+      txUnsigned: txUnsigned.toXDR(),
+      simulation,
+      result: parseResultXdr(simulation.result.retval),
+    };
   }
 
   if (authsCount > 1) {
@@ -146,27 +150,39 @@ export async function invoke<R extends ResponseTypes, T = string>({
     throw new Error("Not connected to Freighter");
   }
 
-  tx = await signTx(
-    wallet,
-    SorobanClient.assembleTransaction(tx, networkPassphrase, simulated).build(),
-    networkPassphrase
-  );
+  const txSigned = await signTx(wallet, txUnsigned, networkPassphrase);
 
-  const raw = await sendTx(tx, secondsToWait, server);
-  if (responseType === "full") {
-    return raw;
+  const data = {
+    simulation,
+    txUnsigned: txUnsigned.toXDR(),
+    txSigned: txSigned.toXDR(),
+    ...await sendTx(txSigned, secondsToWait, server)
+  };
+
+  if (responseType === "full") return data;
+
+  // if `sendTx` awaited the inclusion of the tx in the ledger, it used `getTransaction`
+  if (
+    "getTransactionResponse" in data &&
+    data.getTransactionResponse
+  ) {
+    // getTransactionResponse has a `returnValue` field unless it failed
+    if ("returnValue" in data.getTransactionResponse) return {
+      ...data,
+      result: parse(data.getTransactionResponse.returnValue!)
+    };
+
+    // if "returnValue" not present, the transaction failed; return without parsing the result
+    console.error("Transaction failed! Cannot parse result.");
+    return data;
   }
 
-  // if `sendTx` awaited the inclusion of the tx in the ledger, it used
-  // `getTransaction`, which has a `returnValue` field
-  if ("returnValue" in raw) return parse(raw.returnValue!);
 
-  // otherwise, it returned the result of `sendTransaction`
-  if ("errorResultXdr" in raw) return parse(raw.errorResultXdr!);
-
-  // if neither of these are present, something went wrong
-  console.error("Don't know how to parse result! Returning full RPC response.");
-  return raw;
+  // if it didn't await, it returned the result of `sendTransaction`
+  return {
+    ...data,
+    result: parse(data.sendTransactionResponse.errorResultXdr!),
+  };
 }
 
 /**
@@ -196,6 +212,8 @@ export async function signTx(
  * Send a transaction to the Soroban network.
  *
  * Wait `secondsToWait` seconds for the transaction to complete (default: 10).
+ * If you pass `0`, it will automatically return the `sendTransaction` results,
+ * rather than using `getTransaction`.
  *
  * If you need to construct or sign a transaction yourself rather than using
  * `invoke` or one of the exported contract methods, you may want to use this
@@ -206,16 +224,17 @@ export async function sendTx(
   tx: Tx,
   secondsToWait: number,
   server: SorobanClient.Server
-): Promise<SendTx | GetTx> {
+): Promise<{ sendTransactionResponse: SendTx, getTransactionResponse?: GetTx, getTransactionResponseAll?: GetTx[] }> {
   const sendTransactionResponse = await server.sendTransaction(tx);
 
   if (sendTransactionResponse.status !== "PENDING" || secondsToWait === 0) {
-    return sendTransactionResponse;
+    return { sendTransactionResponse };
   }
 
-  let getTransactionResponse = await server.getTransaction(
+  const getTransactionResponseAll: GetTx[] = [];
+  getTransactionResponseAll.push(await server.getTransaction(
     sendTransactionResponse.hash
-  );
+  ));
 
   const waitUntil = new Date(Date.now() + secondsToWait * 1000).valueOf();
 
@@ -224,19 +243,19 @@ export async function sendTx(
 
   while (
     Date.now() < waitUntil &&
-    getTransactionResponse.status === SorobanRpc.GetTransactionStatus.NOT_FOUND
+    getTransactionResponseAll[getTransactionResponseAll.length - 1].status === SorobanRpc.GetTransactionStatus.NOT_FOUND
   ) {
     // Wait a beat
     await new Promise((resolve) => setTimeout(resolve, waitTime));
     /// Exponential backoff
     waitTime = waitTime * exponentialFactor;
     // See if the transaction is complete
-    getTransactionResponse = await server.getTransaction(
+    getTransactionResponseAll.push(await server.getTransaction(
       sendTransactionResponse.hash
-    );
+    ));
   }
 
-  if (getTransactionResponse.status === SorobanRpc.GetTransactionStatus.NOT_FOUND) {
+  if (getTransactionResponseAll[getTransactionResponseAll.length - 1].status === SorobanRpc.GetTransactionStatus.NOT_FOUND) {
     console.error(
       `Waited ${
         secondsToWait
@@ -250,5 +269,9 @@ export async function sendTx(
     );
   }
 
-  return getTransactionResponse;
+  return {
+    sendTransactionResponse,
+    getTransactionResponseAll,
+    getTransactionResponse: getTransactionResponseAll[getTransactionResponseAll.length - 1]
+  };
 }
