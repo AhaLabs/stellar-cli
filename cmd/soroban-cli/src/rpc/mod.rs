@@ -21,13 +21,15 @@ use std::{
     str::FromStr,
     time::{Duration, Instant},
 };
+use stellar_xdr::curr::ContractEventType;
 use termcolor::{Color, ColorChoice, StandardStream, WriteColor};
 use termcolor_output::colored;
 use tokio::time::sleep;
 
-use crate::utils::contract_spec;
-
+pub mod log;
 mod txn;
+
+pub use txn::*;
 
 const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
 
@@ -88,7 +90,7 @@ pub enum Error {
     #[error("unexpected contract code data type: {0:?}")]
     UnexpectedContractCodeDataType(LedgerEntryData),
     #[error(transparent)]
-    CouldNotParseContractSpec(#[from] contract_spec::Error),
+    CouldNotParseContractSpec(#[from] soroban_spec_tools::contract::Error),
     #[error("unexpected contract code got token")]
     UnexpectedToken(ContractDataEntry),
     #[error(transparent)]
@@ -99,6 +101,11 @@ pub enum Error {
     LargeFee(u64),
     #[error("Cannot authorize raw transactions")]
     CannotAuthorizeRawTransaction,
+
+    #[error("Missing result for tnx")]
+    MissingOp,
+    #[error("A simulation is not a transaction")]
+    NotSignedTransaction,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -170,11 +177,44 @@ impl TryInto<GetTransactionResponse> for GetTransactionResponseRaw {
     }
 }
 
+impl GetTransactionResponse {
+    pub fn return_value(&self) -> Result<xdr::ScVal, Error> {
+        if let Some(xdr::TransactionMeta::V3(xdr::TransactionMetaV3 {
+            soroban_meta: Some(xdr::SorobanTransactionMeta { return_value, .. }),
+            ..
+        })) = self.result_meta.as_ref()
+        {
+            Ok(return_value.clone())
+        } else {
+            Err(Error::MissingOp)
+        }
+    }
+
+    pub fn events(&self) -> Result<Vec<DiagnosticEvent>, Error> {
+        if let Some(meta) = self.result_meta.as_ref() {
+            Ok(extract_events(meta))
+        } else {
+            Err(Error::MissingOp)
+        }
+    }
+
+    pub fn contract_events(&self) -> Result<Vec<DiagnosticEvent>, Error> {
+        Ok(self
+            .events()?
+            .into_iter()
+            .filter(|e| matches!(e.event.type_, ContractEventType::Contract))
+            .collect::<Vec<_>>())
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct LedgerEntryResult {
     pub key: String,
     pub xdr: String,
-    #[serde(rename = "lastModifiedLedgerSeq")]
+    #[serde(
+        rename = "lastModifiedLedgerSeq",
+        deserialize_with = "deserialize_number_from_string"
+    )]
     pub last_modified_ledger: u32,
     #[serde(
         rename = "liveUntilLedgerSeq",
@@ -188,7 +228,10 @@ pub struct LedgerEntryResult {
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct GetLedgerEntriesResponse {
     pub entries: Option<Vec<LedgerEntryResult>>,
-    #[serde(rename = "latestLedger")]
+    #[serde(
+        rename = "latestLedger",
+        deserialize_with = "deserialize_number_from_string"
+    )]
     pub latest_ledger: i64,
 }
 
@@ -614,7 +657,7 @@ soroban config identity fund {address} --helper-url <url>"#
     pub async fn send_transaction(
         &self,
         tx: &TransactionEnvelope,
-    ) -> Result<(TransactionResult, TransactionMeta, Vec<DiagnosticEvent>), Error> {
+    ) -> Result<GetTransactionResponse, Error> {
         let client = self.client()?;
         tracing::trace!("Sending:\n{tx:#?}");
         let SendTransactionResponse {
@@ -656,14 +699,8 @@ soroban config identity fund {address} --helper-url <url>"#
                 "SUCCESS" => {
                     // TODO: the caller should probably be printing this
                     tracing::trace!("{response:#?}");
-                    let GetTransactionResponse {
-                        result,
-                        result_meta,
-                        ..
-                    } = response;
-                    let meta = result_meta.ok_or(Error::MissingResult)?;
-                    let events = extract_events(&meta);
-                    return Ok((result.ok_or(Error::MissingResult)?, meta, events));
+
+                    return Ok(response);
                 }
                 "FAILED" => {
                     tracing::error!("{response:#?}");
@@ -693,20 +730,39 @@ soroban config identity fund {address} --helper-url <url>"#
     ) -> Result<SimulateTransactionResponse, Error> {
         tracing::trace!("Simulating:\n{tx:#?}");
         let base64_tx = tx.to_xdr_base64(Limits::none())?;
-        let mut builder = ObjectParams::new();
-        builder.insert("transaction", base64_tx)?;
         let response: SimulateTransactionResponse = self
             .client()?
-            .request("simulateTransaction", builder)
+            .request("simulateTransaction", rpc_params![base64_tx])
             .await?;
         tracing::trace!("Simulation response:\n {response:#?}");
         match response.error {
             None => Ok(response),
             Some(e) => {
-                crate::log::diagnostic_events(&response.events, tracing::Level::ERROR);
+                log::diagnostic_events(&response.events, tracing::Level::ERROR);
                 Err(Error::TransactionSimulationFailed(e))
             }
         }
+    }
+
+    pub async fn send_assembled_transaction(
+        &self,
+        txn: txn::Assembled,
+        source_key: &ed25519_dalek::SigningKey,
+        signers: &[ed25519_dalek::SigningKey],
+        network_passphrase: &str,
+        log_events: Option<LogEvents>,
+        log_resources: Option<LogResources>,
+    ) -> Result<GetTransactionResponse, Error> {
+        let seq_num = txn.sim_res().latest_ledger + 60; //5 min;
+        let authorized = txn
+            .handle_restore(self, source_key, network_passphrase)
+            .await?
+            .authorize(self, source_key, signers, seq_num, network_passphrase)
+            .await?;
+        authorized.log(log_events, log_resources)?;
+
+        let tx = authorized.sign(source_key, network_passphrase)?;
+        self.send_transaction(&tx).await
     }
 
     pub async fn prepare_and_send_transaction(
@@ -717,17 +773,24 @@ soroban config identity fund {address} --helper-url <url>"#
         network_passphrase: &str,
         log_events: Option<LogEvents>,
         log_resources: Option<LogResources>,
-    ) -> Result<(TransactionResult, TransactionMeta, Vec<DiagnosticEvent>), Error> {
+    ) -> Result<GetTransactionResponse, Error> {
         let txn = txn::Assembled::new(tx_without_preflight, self).await?;
-        let seq_num = txn.sim_res().latest_ledger + 60; //5 min;
-        let authorized = txn
-            .handle_restore(self, source_key, network_passphrase)
-            .await?
-            .authorize(self, source_key, signers, seq_num, network_passphrase)
-            .await?;
-        authorized.log(log_events, log_resources)?;
-        let tx = authorized.sign(source_key, network_passphrase)?;
-        self.send_transaction(&tx).await
+        self.send_assembled_transaction(
+            txn,
+            source_key,
+            signers,
+            network_passphrase,
+            log_events,
+            log_resources,
+        )
+        .await
+    }
+
+    pub async fn create_assembled_transaction(
+        &self,
+        txn: &Transaction,
+    ) -> Result<txn::Assembled, Error> {
+        txn::Assembled::new(txn, self).await
     }
 
     pub async fn get_transaction(&self, tx_id: &str) -> Result<GetTransactionResponseRaw, Error> {
@@ -898,7 +961,7 @@ soroban config identity fund {address} --helper-url <url>"#
             xdr::ScVal::ContractInstance(xdr::ScContractInstance {
                 executable: xdr::ContractExecutable::Wasm(hash),
                 ..
-            }) => Ok(contract_spec::ContractSpec::new(
+            }) => Ok(soroban_spec_tools::contract::Contract::new(
                 &self.get_remote_wasm_from_hash(hash).await?,
             )
             .map_err(Error::CouldNotParseContractSpec)?

@@ -300,28 +300,31 @@ impl Cmd {
             &key,
         )?;
 
-        let (result, meta, events) = client
-            .prepare_and_send_transaction(
-                &tx,
-                &key,
-                &signers,
-                &network.network_passphrase,
-                Some(log_events),
-                (global_args.verbose || global_args.very_verbose || self.cost)
-                    .then_some(log_resources),
+        let mut txn = client.create_assembled_transaction(&tx).await?;
+        let (return_value, events) = if txn.is_view() {
+            (
+                txn.sim_res().results()?[0].xdr.clone(),
+                txn.sim_res().events()?,
             )
-            .await?;
-
-        tracing::debug!(?result);
-        crate::log::diagnostic_events(&events, tracing::Level::INFO);
-        let xdr::TransactionMeta::V3(xdr::TransactionMetaV3 {
-            soroban_meta: Some(xdr::SorobanTransactionMeta { return_value, .. }),
-            ..
-        }) = meta
-        else {
-            return Err(Error::MissingOperationResult);
+        } else {
+            if let Some(instructions) = self.instructions {
+                txn = txn.set_max_instructions(instructions);
+            }
+            let res = client
+                .send_assembled_transaction(
+                    txn,
+                    &key,
+                    &signers,
+                    &network.network_passphrase,
+                    Some(log_events),
+                    (global_args.verbose || global_args.very_verbose || self.cost)
+                        .then_some(log_resources),
+                )
+                .await?;
+            (res.return_value()?, res.contract_events()?)
         };
 
+        crate::log::diagnostic_events(&events, tracing::Level::INFO);
         output_to_string(&spec, &return_value, &function)
     }
 
