@@ -16,7 +16,6 @@ use soroban_env_host::xdr::{
 };
 use soroban_sdk::token;
 use soroban_sdk::xdr::Limits;
-use soroban_spec_tools::contract::Spec;
 use std::{
     fmt::Display,
     str::FromStr,
