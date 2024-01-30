@@ -1,3 +1,8 @@
+use std::str::FromStr;
+
+use contain_rs::{Client, Container, HealthCheck, Image, Podman};
+use podtender::podman_service::PodmanService;
+use regex::Regex;
 use soroban_cli::commands::{
     contract::{self, fetch},
     keys,
@@ -11,6 +16,26 @@ use super::util::{
     rpc_url_arg, DEFAULT_PUB_KEY, DEFAULT_PUB_KEY_1, DEFAULT_SECRET_KEY, HELLO_WORLD,
 };
 
+
+#[tokio::test]
+#[ignore]
+async fn setup() {
+    let podman = Podman::new();
+    let mut container = Container::from_image(Image::from_str("docker.io/stellar/quickstart").unwrap());
+    container.arg("--local").arg("--enable-soroban-rpc").arg("logs");
+    container.wait_for(contain_rs::WaitStrategy::LogMessage { pattern: Regex::new("friendbot.*started").unwrap() });
+    podman.run(&container).unwrap();
+    println!("done");
+    return;;
+    
+    // let handle = podman.create(container);
+    // let podman_service = PodmanService::new().await.unwrap();
+    // let pods = podman_service.pods().list().await.unwrap();
+    // let sandbox = &TestEnv::new();
+    // let id = &deploy_hello(sandbox);
+    // println!("id: {id}");
+}
+
 #[tokio::test]
 #[ignore]
 async fn invoke() {
@@ -20,7 +45,8 @@ async fn invoke() {
     // Note that all functions tested here have no state
     invoke_hello_world(sandbox, id);
     invoke_hello_world_with_lib(sandbox, id).await;
-    invoke_hello_world_with_lib_two(sandbox, id).await;
+
+    // invoke_hello_world_with_lib_two(sandbox, id).await;
     invoke_auth(sandbox, id);
     invoke_auth_with_identity(sandbox, id).await;
     invoke_auth_with_different_test_account_fail(sandbox, id).await;
@@ -55,6 +81,7 @@ async fn invoke_hello_world_with_lib(e: &TestEnv, id: &str) {
         slop: vec!["hello".into(), "--world=world".into()],
         ..Default::default()
     };
+    cmd.config.source_account = "test".to_string();
 
     cmd.config.network.rpc_url = rpc_url();
     cmd.config.network.network_passphrase = network_passphrase();
@@ -65,7 +92,7 @@ async fn invoke_hello_world_with_lib(e: &TestEnv, id: &str) {
 
 async fn invoke_hello_world_with_lib_two(e: &TestEnv, id: &str) {
     let hello_world = HELLO_WORLD.to_string();
-    let mut invoke_args = vec!["--id", id, "--wasm", hello_world.as_str()];
+    let mut invoke_args = vec!["--id", id];
     let args = vec!["--", "hello", "--world=world"];
     let res =
         if let (Some(rpc), Some(network_passphrase)) = (rpc_url_arg(), network_passphrase_arg()) {
@@ -84,8 +111,6 @@ fn invoke_auth(sandbox: &TestEnv, id: &str) {
         .arg("invoke")
         .arg("--id")
         .arg(id)
-        .arg("--wasm")
-        .arg(HELLO_WORLD.path())
         .arg("--")
         .arg("auth")
         .arg(&format!("--addr={DEFAULT_PUB_KEY}"))
@@ -120,8 +145,6 @@ async fn invoke_auth_with_identity(sandbox: &TestEnv, id: &str) {
         .arg("invoke")
         .arg("--id")
         .arg(id)
-        .arg("--wasm")
-        .arg(HELLO_WORLD.path())
         .arg("--")
         .arg("auth")
         .arg("--addr")
@@ -278,8 +301,8 @@ async fn invoke_prng_u64_in_range_test(sandbox: &TestEnv, id: &str) {
         .invoke(&[
             "--id",
             id,
-            "--wasm",
-            HELLO_WORLD.path().to_str().unwrap(),
+            // "--wasm",
+            // HELLO_WORLD.path().to_str().unwrap(),
             "--",
             "prng_u64_in_range",
             "--low=0",

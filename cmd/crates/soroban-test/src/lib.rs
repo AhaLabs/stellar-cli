@@ -23,7 +23,7 @@
     clippy::must_use_candidate,
     clippy::missing_panics_doc
 )]
-use std::{ffi::OsString, fmt::Display, path::Path};
+use std::{env, ffi::OsString, fmt::Display, path::Path};
 
 use assert_cmd::{assert::Assert, Command};
 use assert_fs::{fixture::FixtureError, prelude::PathChild, TempDir};
@@ -53,11 +53,12 @@ pub enum Error {
 /// its own `TempDir` where it will save test-specific configuration.
 pub struct TestEnv {
     pub temp_dir: TempDir,
+    pub port: u16,
 }
 
 impl Default for TestEnv {
     fn default() -> Self {
-        Self::new().unwrap()
+        Self::new(8000).unwrap()
     }
 }
 
@@ -79,16 +80,25 @@ impl TestEnv {
         let test_env = TestEnv::default();
         f(&test_env);
     }
-    pub fn new() -> Result<TestEnv, Error> {
-        let this = TempDir::new().map(|temp_dir| TestEnv { temp_dir })?;
-        std::env::set_var("XDG_CONFIG_HOME", this.temp_dir.as_os_str());
+    pub fn new(port: u16) -> Result<TestEnv, Error> {
+        let this = TempDir::new().map(|temp_dir| TestEnv { temp_dir, port })?;
+        env::set_var("XDG_CONFIG_HOME", this.temp_dir.as_os_str());
+        env::set_var("SOROBAN_ACCOUNT", "test");
+        // env::set_var("SOROBAN_INVOKE", "./.soroban");
+        env::set_var(
+            "SOROBAN_RPC_URL",
+            format!("http://localhost:{port}/soroban/rpc"),
+        );
+        env::set_var(
+            "SOROBAN_NETWORK_PASSPHRASE",
+            "Standalone Network ; February 2017",
+        );
         this.new_assert_cmd("keys")
             .arg("generate")
             .arg("test")
             .arg("-d")
-            .arg("--no-fund")
+            // .arg("--no-fund")
             .assert();
-        std::env::set_var("SOROBAN_ACCOUNT", "test");
         Ok(this)
     }
 
@@ -96,6 +106,7 @@ impl TestEnv {
     /// to be the internal `temp_dir`.
     pub fn new_assert_cmd(&self, subcommand: &str) -> Command {
         let mut this = Command::cargo_bin("soroban").unwrap_or_else(|_| Command::new("soroban"));
+
         this.arg("-q");
         this.arg(subcommand);
         this.current_dir(&self.temp_dir);
@@ -181,7 +192,7 @@ impl TestEnv {
 
     /// Copy the contents of the current `TestEnv` to another `TestEnv`
     pub fn fork(&self) -> Result<TestEnv, Error> {
-        let this = TestEnv::new()?;
+        let this = TestEnv::new(self.port)?;
         self.save(&this.temp_dir)?;
         Ok(this)
     }
