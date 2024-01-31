@@ -242,6 +242,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "bollard"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d82e7850583ead5f8bbef247e2a3c37a19bd576e8420cd262a6711921827e1e5"
+dependencies = [
+ "base64 0.13.1",
+ "bollard-stubs",
+ "bytes",
+ "futures-core",
+ "futures-util",
+ "hex",
+ "http",
+ "hyper",
+ "hyperlocal",
+ "log",
+ "pin-project-lite",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_urlencoded",
+ "thiserror",
+ "tokio",
+ "tokio-util",
+ "url",
+ "winapi",
+]
+
+[[package]]
 name = "bollard-stubs"
 version = "1.42.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2231,6 +2259,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyperlocal"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fafdf7b2b2de7c9784f76e02c0935e65a8117ec3b768644379983ab333ac98c"
+dependencies = [
+ "futures-util",
+ "hex",
+ "hyper",
+ "pin-project",
+ "tokio",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4017,6 +4058,7 @@ dependencies = [
  "testcontainers-modules",
  "thiserror",
  "tokio",
+ "walkdir",
  "which",
 ]
 
@@ -4268,6 +4310,8 @@ version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f83d2931d7f521af5bae989f716c3fa43a6af9af7ec7a5e21b59ae40878cec00"
 dependencies = [
+ "async-trait",
+ "bollard",
  "bollard-stubs",
  "futures",
  "hex",
@@ -4277,6 +4321,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.8",
+ "tokio",
 ]
 
 [[package]]

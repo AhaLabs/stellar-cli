@@ -1,8 +1,10 @@
-use soroban_cli::commands::{
+use std::{thread::sleep, time::Duration};
+
+use soroban_cli::{commands::{
     contract::{self, fetch},
     keys,
-};
-use soroban_test::TestEnv;
+}, rpc::Client};
+use soroban_test::{TestEnv, module};
 
 use crate::{integration::util::extend_contract, util::DEFAULT_SEED_PHRASE};
 
@@ -14,6 +16,23 @@ use super::util::{
 #[tokio::test]
 #[ignore]
 async fn invoke() {
+    let docker = module::docker();
+    let node = module::start(&docker);
+    // return;
+    let host_port = node.get_host_port_ipv4(8000);
+    let url: String = format!("http://localhost:{host_port}/soroban/rpc");
+    println!("{url}");
+    // sleep(Duration::from_secs(2000));
+    let client = Client::new(&url).unwrap();
+    for _ in 0..10 {
+        sleep(Duration::from_secs(1));
+        println!("{:#?}", client.get_network().await);
+    }
+    std::env::set_var("SOROBAN_RPC_URL", url);
+    std::env::set_var(
+        "SOROBAN_NETWORK_PASSPHRASE",
+        "Standalone Network ; February 2017",
+    );
     let sandbox = &TestEnv::default();
     let id = &deploy_hello(sandbox);
     extend_contract(sandbox, id, HELLO_WORLD).await;

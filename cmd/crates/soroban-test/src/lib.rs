@@ -87,7 +87,7 @@ impl TestEnv {
             .arg("generate")
             .arg("test")
             .arg("-d")
-            .arg("--no-fund")
+            // .arg("--no-fund")
             .assert();
         std::env::set_var("SOROBAN_ACCOUNT", "test");
         Ok(this)

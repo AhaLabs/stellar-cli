@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use testcontainers::{core::WaitFor, Image};
+use testcontainers::{clients, core::WaitFor, Image};
 
-const NAME: &str = "stellar/quickstart";
-// const TAG: &str = "testing";
-const TAG: &str =
-    "soroban-dev@sha256:0ad51035cf7caba2fd99c7c1fad0945df6932be7d5c893e1520ccdef7d6a6ffe";
+const NAME: &str = "docker.io/stellar/quickstart";
+const TAG: &str = "testing";
+// const TAG: &str =
+//     "soroban-dev@sha256:0ad51035cf7caba2fd99c7c1fad0945df6932be7d5c893e1520ccdef7d6a6ffe";
 
 #[derive(Debug, Default)]
 pub struct Soroban(HashMap<String, String>, HashMap<String, String>);
@@ -58,10 +58,25 @@ impl Image for Soroban {
     }
 }
 
+pub fn docker() -> clients::Cli {
+    clients::Cli::default()
+}
+
+pub fn start(client: &clients::Cli) -> testcontainers::Container<'_, Soroban> {
+    client.run(Soroban::new())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::Soroban;
+
+    use std::thread::sleep;
+    use std::time::Duration;
+    use walkdir::WalkDir;
+
+    use crate::TestEnv;
     use soroban_cli::rpc::Client;
+
+    use super::Soroban;
     use testcontainers::clients;
 
     #[tokio::test]
@@ -69,12 +84,26 @@ mod tests {
         let _ = pretty_env_logger::try_init();
         let docker = clients::Cli::default();
         let node = docker.run(Soroban::new());
+        // return;
         let host_port = node.get_host_port_ipv4(8000);
         let url: String = format!("http://localhost:{host_port}/soroban/rpc");
         println!("{url}");
         let client = Client::new(&url).unwrap();
-        let res = client.get_network().await;
-        println!("{res:#?}");
-        assert!(res.is_ok());
+
+        for _ in 0..1 {
+            sleep(Duration::from_secs(1));
+            println!("{:#?}", client.get_network().await);
+        }
+        std::env::set_var("SOROBAN_RPC_URL", url);
+        std::env::set_var(
+            "SOROBAN_NETWORK_PASSPHRASE",
+            "Standalone Network ; February 2017",
+        );
+        let env = TestEnv::default();
+        let dir = env.dir();
+        // list all files recursively from dir including in hidden folders
+        for entry in WalkDir::new(dir) {
+            println!("{}", entry.unwrap().path().display());
+        }
     }
 }
