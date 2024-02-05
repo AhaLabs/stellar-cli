@@ -83,12 +83,13 @@ impl TestEnv {
     pub fn new() -> Result<TestEnv, Error> {
         let this = TempDir::new().map(|temp_dir| TestEnv { temp_dir })?;
         std::env::set_var("XDG_CONFIG_HOME", this.temp_dir.as_os_str());
-        this.new_assert_cmd("keys")
+        let stdout = this.new_assert_cmd("keys")
             .arg("generate")
             .arg("test")
             .arg("-d")
-            // .arg("--no-fund")
-            .assert();
+            .arg("--no-fund")
+            .assert().stdout_as_str();
+        println!("{stdout}");
         std::env::set_var("SOROBAN_ACCOUNT", "test");
         Ok(this)
     }
@@ -97,8 +98,8 @@ impl TestEnv {
     /// to be the internal `temp_dir`.
     pub fn new_assert_cmd(&self, subcommand: &str) -> Command {
         let mut this = Command::cargo_bin("soroban").unwrap_or_else(|_| Command::new("soroban"));
-        this.arg("-q");
         this.arg(subcommand);
+        this.env("RUST_LOG", "trace");
         this.current_dir(&self.temp_dir);
         this
     }

@@ -1,10 +1,13 @@
 use std::{thread::sleep, time::Duration};
 
-use soroban_cli::{commands::{
-    contract::{self, fetch},
-    keys,
-}, rpc::Client};
-use soroban_test::{TestEnv, module};
+use soroban_cli::{
+    commands::{
+        contract::{self, fetch},
+        keys,
+    },
+    rpc::Client,
+};
+use soroban_test::{module, AssertExt, TestEnv};
 
 use crate::{integration::util::extend_contract, util::DEFAULT_SEED_PHRASE};
 
@@ -16,24 +19,51 @@ use super::util::{
 #[tokio::test]
 #[ignore]
 async fn invoke() {
-    let docker = module::docker();
-    let node = module::start(&docker);
-    // return;
-    let host_port = node.get_host_port_ipv4(8000);
+    // let docker = module::docker();
+    // let node = module::start(&docker);
+    // // return;
+    // let host_port = node.get_host_port_ipv4(8000);
+    // let container = module::podman().await;
+    let host_port = 8000;
+    // let url: String = format!("http://localhost:{host_port}/soroban/rpc");
+    // println!("{url}");
+    // let client = Client::new(&url).unwrap();
+
+    // for _ in 0..30 {
+    //     sleep(Duration::from_millis(10));
+    //     if client.get_network().await.is_ok() {
+    //         break;
+    //     }
+    // }
     let url: String = format!("http://localhost:{host_port}/soroban/rpc");
-    println!("{url}");
-    // sleep(Duration::from_secs(2000));
-    let client = Client::new(&url).unwrap();
-    for _ in 0..10 {
-        sleep(Duration::from_secs(1));
-        println!("{:#?}", client.get_network().await);
-    }
+    // println!("{url}");
+    // // sleep(Duration::from_secs(2000));
+    // let client = Client::new(&url).unwrap();
+    // for _ in 0..100 {
+    //     sleep(Duration::from_secs(1));
+    //     println!("{:#?}", client.get_network().await);
+    // }
     std::env::set_var("SOROBAN_RPC_URL", url);
     std::env::set_var(
         "SOROBAN_NETWORK_PASSPHRASE",
         "Standalone Network ; February 2017",
     );
     let sandbox = &TestEnv::default();
+    let stdout = sandbox
+        .new_assert_cmd("keys")
+        .arg("fund")
+        .arg("test")
+        // .arg("-d")
+        // .arg("--no-fund")
+        .assert()
+        .stdout_as_str();
+    println!("{stdout}");
+
+    let dir = sandbox.dir();
+    // list all files recursively from dir including in hidden folders
+    for entry in walkdir::WalkDir::new(dir) {
+        println!("{}", entry.unwrap().path().display());
+    }
     let id = &deploy_hello(sandbox);
     extend_contract(sandbox, id, HELLO_WORLD).await;
     // Note that all functions tested here have no state
@@ -52,6 +82,11 @@ async fn invoke() {
     handles_kebab_case(sandbox, id).await;
     fetch(sandbox, id).await;
     invoke_prng_u64_in_range_test(sandbox, id).await;
+    //     container
+    //     .stop(&podman_api::opts::ContainerStopOpts::builder().build())
+    //     .await
+    //     .unwrap();
+    // container.remove().await.unwrap();
 }
 
 fn invoke_hello_world(sandbox: &TestEnv, id: &str) {
@@ -77,6 +112,7 @@ async fn invoke_hello_world_with_lib(e: &TestEnv, id: &str) {
 
     cmd.config.network.rpc_url = rpc_url();
     cmd.config.network.network_passphrase = network_passphrase();
+    cmd.config.source_account = "test".to_string();
 
     let res = e.invoke_cmd(cmd).await.unwrap();
     assert_eq!(res, r#"["Hello","world"]"#);
@@ -84,7 +120,7 @@ async fn invoke_hello_world_with_lib(e: &TestEnv, id: &str) {
 
 async fn invoke_hello_world_with_lib_two(e: &TestEnv, id: &str) {
     let hello_world = HELLO_WORLD.to_string();
-    let mut invoke_args = vec!["--id", id, "--wasm", hello_world.as_str()];
+    let mut invoke_args = vec!["--id", id];
     let args = vec!["--", "hello", "--world=world"];
     let res =
         if let (Some(rpc), Some(network_passphrase)) = (rpc_url_arg(), network_passphrase_arg()) {
@@ -103,8 +139,6 @@ fn invoke_auth(sandbox: &TestEnv, id: &str) {
         .arg("invoke")
         .arg("--id")
         .arg(id)
-        .arg("--wasm")
-        .arg(HELLO_WORLD.path())
         .arg("--")
         .arg("auth")
         .arg(&format!("--addr={DEFAULT_PUB_KEY}"))
@@ -139,8 +173,6 @@ async fn invoke_auth_with_identity(sandbox: &TestEnv, id: &str) {
         .arg("invoke")
         .arg("--id")
         .arg(id)
-        .arg("--wasm")
-        .arg(HELLO_WORLD.path())
         .arg("--")
         .arg("auth")
         .arg("--addr")
@@ -297,8 +329,6 @@ async fn invoke_prng_u64_in_range_test(sandbox: &TestEnv, id: &str) {
         .invoke(&[
             "--id",
             id,
-            "--wasm",
-            HELLO_WORLD.path().to_str().unwrap(),
             "--",
             "prng_u64_in_range",
             "--low=0",

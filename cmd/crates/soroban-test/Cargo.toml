@@ -40,6 +40,8 @@ testcontainers.version = "0.15.0"
 testcontainers.features = ["experimental"]
 testcontainers-modules.version = "0.3.1"
 testcontainers-modules.features = ["redis"]
+podman-api = "0.10.0"
+phf = { version = "0.11.2", features = ["macros"] }
 
 [dev-dependencies]
 serde_json = "1.0.93"
