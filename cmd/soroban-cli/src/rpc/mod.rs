@@ -107,6 +107,8 @@ pub enum Error {
 
     #[error("Missing result for tnx")]
     MissingOp,
+    #[error(transparent)]
+    Http(#[from] http::Error),
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -536,7 +538,7 @@ pub struct FullLedgerEntries {
 }
 
 pub struct Client {
-    base_url: String,
+    base_uri: http::Uri,
 }
 
 impl Client {
@@ -563,15 +565,13 @@ impl Client {
                 }
             }
         }
-        let uri = Uri::from_parts(parts).map_err(Error::InvalidRpcUrlFromUriParts)?;
-        tracing::trace!(?uri);
-        Ok(Self {
-            base_url: uri.to_string(),
-        })
+        let base_uri = Uri::from_parts(parts).map_err(Error::InvalidRpcUrlFromUriParts)?;
+        tracing::trace!("rpc_uri: {base_uri}");
+        Ok(Self { base_uri })
     }
 
     fn client(&self) -> Result<HttpClient, Error> {
-        let url = self.base_url.clone();
+        let url = self.base_uri.to_string();
         let mut headers = HeaderMap::new();
         headers.insert("X-Client-Name", "soroban-cli".parse().unwrap());
         let version = VERSION.unwrap_or("devel");
@@ -581,15 +581,32 @@ impl Client {
             .build(url)?)
     }
 
-    pub async fn friendbot_url(&self) -> Result<String, Error> {
+    pub async fn friendbot_url(&self) -> Result<http::Uri, Error> {
         let network = self.get_network().await?;
         tracing::trace!("{network:#?}");
-        network.friendbot_url.ok_or_else(|| {
+
+        let uri = network.friendbot_url.ok_or_else(|| {
             Error::NotFound(
                 "Friendbot".to_string(),
                 "Friendbot is not available on this network".to_string(),
             )
-        })
+        })?;
+        let uri = http::Uri::from_str(&uri).map_err(|_| Error::InvalidUrl(uri.to_string()))?;
+        let (rpc_host, friendbot_host) = (self.base_uri.host(), uri.host());
+        if rpc_host == friendbot_host {
+            let authority = uri.authority().unwrap().clone();
+            let host = authority.host();
+            let authority = format!("{host}:{}", self.base_uri.port().unwrap());
+            let res = http::Uri::builder()
+                .authority(authority)
+                .scheme(uri.scheme().unwrap().clone())
+                .path_and_query(uri.path_and_query().unwrap().clone())
+                .build()
+                .unwrap();
+            Ok(res)
+        } else {
+            Ok(uri)
+        }
     }
 
     pub async fn verify_network_passphrase(&self, expected: Option<&str>) -> Result<String, Error> {
@@ -712,7 +729,7 @@ soroban config identity fund {address} --helper-url <url>"#
             };
             let duration = start.elapsed();
             // TODO: parameterize the timeout instead of using a magic constant
-            if duration.as_secs() > 10 {
+            if duration.as_secs() > 100 {
                 return Err(Error::TransactionSubmissionTimeout);
             }
             sleep(Duration::from_secs(1)).await;
@@ -1035,29 +1052,59 @@ mod tests {
     fn test_rpc_url_default_ports() {
         // Default ports are added.
         let client = Client::new("http://example.com").unwrap();
-        assert_eq!(client.base_url, "http://example.com:80/");
+        assert_eq!(
+            client.base_uri.to_string().as_str(),
+            "http://example.com:80/"
+        );
         let client = Client::new("https://example.com").unwrap();
-        assert_eq!(client.base_url, "https://example.com:443/");
+        assert_eq!(
+            client.base_uri.to_string().as_str(),
+            "https://example.com:443/"
+        );
 
         // Ports are not added when already present.
         let client = Client::new("http://example.com:8080").unwrap();
-        assert_eq!(client.base_url, "http://example.com:8080/");
+        assert_eq!(
+            client.base_uri.to_string().as_str(),
+            "http://example.com:8080/"
+        );
         let client = Client::new("https://example.com:8080").unwrap();
-        assert_eq!(client.base_url, "https://example.com:8080/");
+        assert_eq!(
+            client.base_uri.to_string().as_str(),
+            "https://example.com:8080/"
+        );
 
         // Paths are not modified.
         let client = Client::new("http://example.com/a/b/c").unwrap();
-        assert_eq!(client.base_url, "http://example.com:80/a/b/c");
+        assert_eq!(
+            client.base_uri.to_string().as_str(),
+            "http://example.com:80/a/b/c"
+        );
         let client = Client::new("https://example.com/a/b/c").unwrap();
-        assert_eq!(client.base_url, "https://example.com:443/a/b/c");
+        assert_eq!(
+            client.base_uri.to_string().as_str(),
+            "https://example.com:443/a/b/c"
+        );
         let client = Client::new("http://example.com/a/b/c/").unwrap();
-        assert_eq!(client.base_url, "http://example.com:80/a/b/c/");
+        assert_eq!(
+            client.base_uri.to_string().as_str(),
+            "http://example.com:80/a/b/c/"
+        );
         let client = Client::new("https://example.com/a/b/c/").unwrap();
-        assert_eq!(client.base_url, "https://example.com:443/a/b/c/");
+        assert_eq!(
+            client.base_uri.to_string().as_str(),
+            "https://example.com:443/a/b/c/"
+        );
         let client = Client::new("http://example.com/a/b:80/c/").unwrap();
-        assert_eq!(client.base_url, "http://example.com:80/a/b:80/c/");
+        assert_eq!(
+            client.base_uri.to_string().as_str(),
+            "http://example.com:80/a/b:80/c/"
+        );
         let client = Client::new("https://example.com/a/b:80/c/").unwrap();
-        assert_eq!(client.base_url, "https://example.com:443/a/b:80/c/");
+        assert_eq!(
+            client.base_uri.to_string().as_str(),
+            "https://example.com:443/a/b:80/c/"
+        );
     }
 
     #[test]

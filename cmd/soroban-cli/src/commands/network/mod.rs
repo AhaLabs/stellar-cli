@@ -141,11 +141,9 @@ impl Network {
     pub async fn helper_url(&self, addr: &str) -> Result<http::Uri, Error> {
         tracing::debug!("address {addr:?}");
         let client = Client::new(&self.rpc_url)?;
-        let helper_url_root = client.friendbot_url().await?;
-        let uri = http::Uri::from_str(&helper_url_root)
-            .map_err(|_| Error::InvalidUrl(helper_url_root.to_string()))?;
+        let uri = client.friendbot_url().await?;
         http::Uri::from_str(&format!("{uri:?}?addr={addr}"))
-            .map_err(|_| Error::InvalidUrl(helper_url_root.to_string()))
+            .map_err(|_| Error::InvalidUrl(uri.to_string()))
     }
 
     #[allow(clippy::similar_names)]

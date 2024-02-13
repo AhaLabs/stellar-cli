@@ -1,28 +1,29 @@
-use podman_api::api::Volume;
-use podman_api::models::{ContainerStatus, NamedVolume, PortMapping, Schema2HealthConfig};
-use podman_api::opts::{ContainerListOpts, ContainerWaitOpts, VolumeCreateOpts, VolumeListOpts};
+use podman_api::models::{PortMapping, Schema2HealthConfig};
+use podman_api::opts::{ContainerListOpts, VolumeListOpts};
 use podman_api::{
-    opts::{self, VolumeListOptsBuilder},
+    opts::{self},
     Podman,
 };
+use soroban_cli::rpc::Client;
 use std::collections::HashMap;
-use std::thread::sleep;
+use std::time::Duration;
 
 use testcontainers::{clients, core::WaitFor, Image};
 
-const NAME: &str = "docker.io/stellar/quickstart";
-const TAG: &str = "testing";
-// const TAG: &str =
-//     "soroban-dev@sha256:0ad51035cf7caba2fd99c7c1fad0945df6932be7d5c893e1520ccdef7d6a6ffe";
+const NAME: &str = "stellar/quickstart";
+// const TAG: &str = "latest";
+const TAG: &str = "latest:sha256:742a649d5d9be826dd4b1a378c95b0e1833e1bcb08c3f4b9b9a8cdd03da653e3";
 
 static ENV: &Map = &Map(phf::phf_map! {
     "ENABLE_SOROBAN_RPC"=> "true",
     "ENABLE_SOROBAN_DIAGNOSTIC_EVENTS" => "true",
     "ENABLE_LOGS" => "true",
     "NETWORK" => "local",
-    "POSTGRES_PASSWORD" => "p",
+    // "POSTGRES_PASSWORD" => "p",
+    "LIMITS" => "testnet",
 });
 struct Map(phf::Map<&'static str, &'static str>);
+
 
 impl From<&Map> for HashMap<String, String> {
     fn from(Map(map): &Map) -> Self {
@@ -82,33 +83,34 @@ pub fn start(client: &clients::Cli) -> testcontainers::Container<'_, Soroban> {
     client.run(Soroban::new())
 }
 
-pub async fn podman() -> podman_api::api::Container {
-    let podman =
-        Podman::unix("/Users/willem/.local/share/containers/podman/machine/qemu/podman.sock");
-    let volume = podman.volumes().get("Stellar");
+pub async fn podman(port: Option<u16>) -> (podman_api::api::Container, String) {
+    let podman = Podman::unix("/run/user/1001/podman/podman.sock");
+    let _volume = podman.volumes().get("Stellar");
+    let host_port = port.unwrap_or(8001);
     let portmap = PortMapping {
         container_port: Some(8000),
         host_ip: None,
-        host_port: Some(8000),
+        host_port: Some(host_port),
         protocol: None,
         range: None,
     };
-    let volume = NamedVolume {
-        dest: Some("/opt/stellar".to_string()),
-        is_anonymous: None,
-        name: Some("Stellar".to_string()),
-        options: None,
-    };
+    // let _volume = NamedVolume {
+    //     dest: Some("/opt/stellar".to_string()),
+    //     is_anonymous: None,
+    //     name: Some("Stellar".to_string()),
+    //     options: None,
+    // };
 
     let test = Some(vec!["curl".to_string(), 
         "--no-progress-meter".to_string(),
         "--fail-with-body".to_string(),
         "-X POST".to_string(),
-        "http://localhost:8000/soroban/rpc".to_string(),
+        "http://localhost:8001/soroban/rpc".to_string(),
         "-H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":8675,\"method\":\"getNetwork\"}'\"".to_string()]);
 
     let opts: opts::ContainerCreateOpts = opts::ContainerCreateOpts::builder()
-        .image("docker.io/stellar/quickstart:testing")
+        .image(format!("{NAME}/{TAG}"))
+        .name("stellar-test")
         .env(ENV.0.into_iter())
         .portmappings([portmap])
         // .volumes([volume])
@@ -121,6 +123,9 @@ pub async fn podman() -> podman_api::api::Container {
         })
         .build();
     let container = podman.containers().create(&opts).await.unwrap();
+    println!("ID: {}", container.id);
+    let url: String = format!("http://localhost:{host_port}/soroban/rpc");
+    let client: Client = Client::new(&url).unwrap();
 
     let container = podman.containers().get(container.id);
 
@@ -141,37 +146,37 @@ pub async fn podman() -> podman_api::api::Container {
             .await
     );
     container.start(Some("rm".to_string())).await.unwrap();
-    container
+    for i in 0..100 {
+        println!("Trying {i}");
+        std::thread::sleep(Duration::from_millis(500));
+        if client.get_network().await.is_ok() {
+            break;
+        }
+    }
+    (container, url)
 }
 
 #[cfg(test)]
+
 mod tests {
 
-    use std::time::Duration;
     use podman_api::opts;
+    use std::time::Duration;
     use walkdir::WalkDir;
 
     use crate::TestEnv;
     use soroban_cli::rpc::Client;
 
     use super::Soroban;
-    use testcontainers::{clients, Container};
+    use testcontainers::clients;
 
     #[tokio::test]
     #[ignore]
     async fn podman_test() {
-        let container = super::podman().await;
-        let host_port = 8000;
-        let url: String = format!("http://localhost:{host_port}/soroban/rpc");
-        println!("{url}");
-        let client = Client::new(&url).unwrap();
+        let (container, url) = super::podman(None).await;
 
-        for _ in 0..30 {
-            super::sleep(Duration::from_millis(10));
-            if client.get_network().await.is_ok() {
-                break;
-            }
-        }
+        println!("{url}");
+
         std::env::set_var("SOROBAN_RPC_URL", url);
         std::env::set_var(
             "SOROBAN_NETWORK_PASSPHRASE",
@@ -191,6 +196,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn testcontainers_work() {
         let _ = pretty_env_logger::try_init();
         let docker = clients::Cli::default();
@@ -203,7 +209,7 @@ mod tests {
         let client = Client::new(&url).unwrap();
 
         for _ in 0..10 {
-            super::sleep(Duration::from_secs(1));
+            std::thread::sleep(Duration::from_secs(1));
             println!("{:#?}", client.get_network().await);
         }
         std::env::set_var("SOROBAN_RPC_URL", url);

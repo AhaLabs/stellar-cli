@@ -10,7 +10,7 @@ use crate::commands::config;
 #[derive(Parser, Debug, Clone)]
 #[group(skip)]
 pub struct Cmd {
-    /// ID of the Soroban contract
+    /// Salt used when deploying
     #[arg(long)]
     pub salt: String,
 
