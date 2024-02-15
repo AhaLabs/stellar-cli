@@ -1,6 +1,5 @@
 
-name: bindings typescript
-
+name: rpc tests
 on:
   push:
     branches: [main, release/**]
@@ -8,7 +7,7 @@ on:
 
 jobs:
   test:
-    name: test generated libraries
+    name: test cli features that require RPC
     runs-on: ubuntu-22.04
     services:
       rpc:
@@ -39,5 +38,6 @@ jobs:
     - run: cargo build
     - run: rustup target add wasm32-unknown-unknown
     - run: make build-test-wasms
+    - run: SOROBAN_PORT=8000 cargo test --features it --package soroban-test --test it -- integration
     - run: npm ci && npm run test
       working-directory: cmd/crates/soroban-spec-typescript/ts-tests
