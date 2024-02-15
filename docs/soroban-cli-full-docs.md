@@ -683,9 +683,6 @@ Initialize a Soroban project with an example contract
 ###### **Options:**
 
 * `-w`, `--with-example <WITH_EXAMPLE>`
-
-  Possible values: `account`, `alloc`, `atomic_multiswap`, `atomic_swap`, `auth`, `cross_contract`, `custom_types`, `deep_contract_auth`, `deployer`, `errors`, `events`, `fuzzing`, `increment`, `liquidity_pool`, `logging`, `mint-lock`, `simple_account`, `single_offer`, `timelock`, `token`, `upgradeable_contract`, `workspace`
-
 * `-f`, `--frontend-template <FRONTEND_TEMPLATE>`
 
   Default value: ``
