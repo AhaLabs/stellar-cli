@@ -817,12 +817,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "directories"
+version = "5.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a49173b84e034382284f27f1af4dcbbd231ffa358c0fe316541a7337f376a35"
+dependencies = [
+ "dirs-sys 0.4.1",
+]
+
+[[package]]
 name = "dirs"
 version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca3aa72a6f96ea37bbc5aa912f6788242832f75369bdfdadcb0e38423f100059"
 dependencies = [
- "dirs-sys",
+ "dirs-sys 0.3.7",
 ]
 
 [[package]]
@@ -834,6 +843,18 @@ dependencies = [
  "libc",
  "redox_users",
  "winapi",
+]
+
+[[package]]
+name = "dirs-sys"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "520f05a5cbd335fae5a99ff7a6ab8627577660ee5cfd6a94a6a929b52ff0321c"
+dependencies = [
+ "libc",
+ "option-ext",
+ "redox_users",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -2705,6 +2726,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "option-ext"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
+
+[[package]]
 name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3604,6 +3631,7 @@ dependencies = [
  "clap_complete",
  "crate-git-revision 0.0.4",
  "csv",
+ "directories",
  "dirs",
  "dotenvy",
  "ed25519-dalek 2.0.0",
@@ -3640,7 +3668,7 @@ dependencies = [
  "soroban-spec",
  "soroban-spec-json",
  "soroban-spec-rust",
- "soroban-spec-tools 20.3.1",
+ "soroban-spec-tools",
  "soroban-spec-typescript",
  "stellar-strkey 0.0.7",
  "stellar-xdr",
@@ -3657,6 +3685,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "ulid",
  "ureq",
  "wasm-opt",
  "wasmparser 0.90.0",
@@ -3754,8 +3783,7 @@ dependencies = [
 [[package]]
 name = "soroban-rpc"
 version = "20.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06a502143406eb8ca6d9e98b6ea50928a5eb47a216a94769bfa13d19c03d41c4"
+source = "git+https://github.com/stellar/soroban-rpc?rev=e84d0154d8ad416d64ac3a2c16d81f962595b5ea#e84d0154d8ad416d64ac3a2c16d81f962595b5ea"
 dependencies = [
  "base64 0.21.7",
  "clap",
@@ -3773,7 +3801,6 @@ dependencies = [
  "soroban-env-host",
  "soroban-sdk",
  "soroban-spec",
- "soroban-spec-tools 20.3.3",
  "stellar-strkey 0.0.7",
  "stellar-xdr",
  "termcolor",
@@ -3886,25 +3913,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "soroban-spec-tools"
-version = "20.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5caac0698a57c2e1c5faaec5dfaa2ce511b822e863500ef225cc34203d0b6a4"
-dependencies = [
- "base64 0.21.7",
- "ethnum",
- "hex",
- "itertools 0.10.5",
- "serde_json",
- "soroban-env-host",
- "soroban-spec",
- "stellar-strkey 0.0.7",
- "stellar-xdr",
- "thiserror",
- "wasmparser 0.90.0",
-]
-
-[[package]]
 name = "soroban-spec-typescript"
 version = "20.3.1"
 dependencies = [
@@ -3942,7 +3950,7 @@ dependencies = [
  "soroban-rpc",
  "soroban-sdk",
  "soroban-spec",
- "soroban-spec-tools 20.3.1",
+ "soroban-spec-tools",
  "stellar-strkey 0.0.7",
  "thiserror",
  "tokio",
@@ -4551,6 +4559,16 @@ name = "typenum"
 version = "1.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
+
+[[package]]
+name = "ulid"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e37c4b6cbcc59a8dcd09a6429fbc7890286bcbb79215cea7b38a3c4c0921d93"
+dependencies = [
+ "rand",
+ "serde",
+]
 
 [[package]]
 name = "unicode-bidi"
