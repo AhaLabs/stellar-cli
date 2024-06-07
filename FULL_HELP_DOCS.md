@@ -40,6 +40,7 @@ This document contains the help content for the `stellar` command-line program.
 * [`stellar xdr`↴](#stellar-xdr)
 * [`stellar xdr types`↴](#stellar-xdr-types)
 * [`stellar xdr types list`↴](#stellar-xdr-types-list)
+* [`stellar xdr types schema`↴](#stellar-xdr-types-schema)
 * [`stellar xdr guess`↴](#stellar-xdr-guess)
 * [`stellar xdr decode`↴](#stellar-xdr-decode)
 * [`stellar xdr encode`↴](#stellar-xdr-encode)
@@ -239,11 +240,11 @@ Deploy builtin Soroban Asset Contract
   Possible values: `true`, `false`
 
 * `--instructions <INSTRUCTIONS>` — Number of instructions to simulate
-* `--build-only` — Build the transaction only write the base64 xdr to stdout
+* `--build-only` — Build the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
-* `--sim-only` — Simulation the transaction only write the base64 xdr to stdout
+* `--sim-only` — Simulate the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
@@ -398,11 +399,11 @@ If no keys are specified the contract itself is extended.
   Possible values: `true`, `false`
 
 * `--instructions <INSTRUCTIONS>` — Number of instructions to simulate
-* `--build-only` — Build the transaction only write the base64 xdr to stdout
+* `--build-only` — Build the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
-* `--sim-only` — Simulation the transaction only write the base64 xdr to stdout
+* `--sim-only` — Simulate the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
@@ -438,11 +439,11 @@ Deploy a wasm contract
   Possible values: `true`, `false`
 
 * `--instructions <INSTRUCTIONS>` — Number of instructions to simulate
-* `--build-only` — Build the transaction only write the base64 xdr to stdout
+* `--build-only` — Build the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
-* `--sim-only` — Simulation the transaction only write the base64 xdr to stdout
+* `--sim-only` — Simulate the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
@@ -610,11 +611,11 @@ Install a WASM file to the ledger without creating a contract instance
   Possible values: `true`, `false`
 
 * `--instructions <INSTRUCTIONS>` — Number of instructions to simulate
-* `--build-only` — Build the transaction only write the base64 xdr to stdout
+* `--build-only` — Build the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
-* `--sim-only` — Simulation the transaction only write the base64 xdr to stdout
+* `--sim-only` — Simulate the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
@@ -667,11 +668,11 @@ soroban contract invoke ... -- --help
   Possible values: `true`, `false`
 
 * `--instructions <INSTRUCTIONS>` — Number of instructions to simulate
-* `--build-only` — Build the transaction only write the base64 xdr to stdout
+* `--build-only` — Build the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
-* `--sim-only` — Simulation the transaction only write the base64 xdr to stdout
+* `--sim-only` — Simulate the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
@@ -787,11 +788,11 @@ If no keys are specificed the contract itself is restored.
   Possible values: `true`, `false`
 
 * `--instructions <INSTRUCTIONS>` — Number of instructions to simulate
-* `--build-only` — Build the transaction only write the base64 xdr to stdout
+* `--build-only` — Build the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
-* `--sim-only` — Simulation the transaction only write the base64 xdr to stdout
+* `--sim-only` — Simulate the transaction and only write the base64 xdr to stdout
 
   Possible values: `true`, `false`
 
@@ -1065,6 +1066,7 @@ View information about types
 ###### **Subcommands:**
 
 * `list` — 
+* `schema` — 
 
 
 
@@ -1079,6 +1081,22 @@ View information about types
   Default value: `plain`
 
   Possible values: `plain`, `json`, `json-formatted`
+
+
+
+
+## `stellar xdr types schema`
+
+**Usage:** `stellar xdr types schema [OPTIONS] --type <TYPE>`
+
+###### **Options:**
+
+* `--type <TYPE>` — XDR type to decode
+* `--output <OUTPUT>`
+
+  Default value: `json-schema-draft201909`
+
+  Possible values: `json-schema-draft7`, `json-schema-draft201909`
 
 
 
