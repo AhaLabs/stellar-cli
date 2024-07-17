@@ -14,7 +14,7 @@ use std::{
     },
     io::{self, Read, Write},
     num::NonZeroU32,
-    path::Path,
+    path::{Path, PathBuf},
     str,
     sync::atomic::AtomicBool,
 };
@@ -232,10 +232,13 @@ fn copy_contents(from: &Path, to: &Path) -> Result<(), Error> {
                 if new_path.to_string_lossy().contains("README.md") {
                     append_contents(&path, &new_path)?;
                 }
+                if new_path.to_string_lossy() == to.join("Cargo.toml").to_string_lossy() {
+                    handle_existing_workspace_cargo_toml_file(path, new_path.clone())?;
+                }
 
                 println!(
                     "ℹ️  Skipped creating {} as it already exists",
-                    &new_path.to_string_lossy()
+                    new_path.to_string_lossy()
                 );
                 continue;
             }
@@ -252,6 +255,25 @@ fn copy_contents(from: &Path, to: &Path) -> Result<(), Error> {
         }
     }
 
+    Ok(())
+}
+
+fn handle_existing_workspace_cargo_toml_file(
+    path: PathBuf,
+    new_path: PathBuf,
+) -> Result<(), Error> {
+    println!(
+        "ℹ️  Overwriting existing workspace Cargo.toml with frontend template's Cargo.toml: {}",
+        &new_path.to_string_lossy()
+    );
+    copy(&path, &new_path).map_err(|e| {
+        eprintln!(
+            "Error copying from {:?} to {:?}",
+            path.to_string_lossy(),
+            new_path
+        );
+        e
+    })?;
     Ok(())
 }
 
