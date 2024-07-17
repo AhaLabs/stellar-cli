@@ -461,6 +461,7 @@ mod tests {
         init(project_dir.as_path(), "", &with_examples).unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -479,6 +480,7 @@ mod tests {
         init(project_dir.as_path(), "", &with_examples).unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -502,6 +504,7 @@ mod tests {
         init(project_dir.as_path(), "", &with_examples).unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -541,6 +544,7 @@ mod tests {
         .unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -569,6 +573,7 @@ mod tests {
         .unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -607,6 +612,7 @@ mod tests {
         .unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -644,6 +650,22 @@ mod tests {
         assert!(contract_dir.as_path().join("Cargo.toml").exists());
         assert!(contract_dir.as_path().join("src").join("lib.rs").exists());
         assert!(contract_dir.as_path().join("src").join("test.rs").exists());
+    }
+
+    fn assert_workspace_cargo_file_is_well_formed(project_dir: &Path) {
+        let cargo_toml_path = project_dir.join("Cargo.toml");
+        let cargo_toml_str = read_to_string(cargo_toml_path.clone()).unwrap();
+        let doc = cargo_toml_str.parse::<toml_edit::Document>().unwrap();
+        println!("{cargo_toml_path:?} contents:\n{cargo_toml_str}");
+        assert!(
+            doc.get("workspace")
+                .unwrap()
+                .get("dependencies")
+                .unwrap()
+                .get("soroban-sdk")
+                .is_some(),
+            "expected [workspace.dependencies] to include soroban-sdk"
+        );
     }
 
     fn assert_contract_cargo_file_is_well_formed(project_dir: &Path, contract_name: &str) {
