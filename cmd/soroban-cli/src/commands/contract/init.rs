@@ -14,7 +14,7 @@ use std::{
     },
     io::{self, Read, Write},
     num::NonZeroU32,
-    path::Path,
+    path::{Path, PathBuf},
     str,
     sync::atomic::AtomicBool,
 };
@@ -232,10 +232,13 @@ fn copy_contents(from: &Path, to: &Path) -> Result<(), Error> {
                 if new_path.to_string_lossy().contains("README.md") {
                     append_contents(&path, &new_path)?;
                 }
+                if new_path.to_string_lossy() == to.join("Cargo.toml").to_string_lossy() {
+                    handle_existing_workspace_cargo_toml_file(path, new_path.clone())?;
+                }
 
                 println!(
                     "ℹ️  Skipped creating {} as it already exists",
-                    &new_path.to_string_lossy()
+                    new_path.to_string_lossy()
                 );
                 continue;
             }
@@ -252,6 +255,25 @@ fn copy_contents(from: &Path, to: &Path) -> Result<(), Error> {
         }
     }
 
+    Ok(())
+}
+
+fn handle_existing_workspace_cargo_toml_file(
+    path: PathBuf,
+    new_path: PathBuf,
+) -> Result<(), Error> {
+    println!(
+        "ℹ️  Overwriting existing workspace Cargo.toml with frontend template's Cargo.toml: {}",
+        &new_path.to_string_lossy()
+    );
+    copy(&path, &new_path).map_err(|e| {
+        eprintln!(
+            "Error copying from {:?} to {:?}",
+            path.to_string_lossy(),
+            new_path
+        );
+        e
+    })?;
     Ok(())
 }
 
@@ -461,6 +483,7 @@ mod tests {
         init(project_dir.as_path(), "", &with_examples).unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -479,6 +502,7 @@ mod tests {
         init(project_dir.as_path(), "", &with_examples).unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -502,6 +526,7 @@ mod tests {
         init(project_dir.as_path(), "", &with_examples).unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -541,6 +566,7 @@ mod tests {
         .unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -569,6 +595,7 @@ mod tests {
         .unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -607,6 +634,7 @@ mod tests {
         .unwrap();
 
         assert_base_template_files_exist(&project_dir);
+        assert_workspace_cargo_file_is_well_formed(&project_dir);
         assert_default_hello_world_contract_files_exist(&project_dir);
         assert_excluded_paths_do_not_exist(&project_dir);
 
@@ -644,6 +672,22 @@ mod tests {
         assert!(contract_dir.as_path().join("Cargo.toml").exists());
         assert!(contract_dir.as_path().join("src").join("lib.rs").exists());
         assert!(contract_dir.as_path().join("src").join("test.rs").exists());
+    }
+
+    fn assert_workspace_cargo_file_is_well_formed(project_dir: &Path) {
+        let cargo_toml_path = project_dir.join("Cargo.toml");
+        let cargo_toml_str = read_to_string(cargo_toml_path.clone()).unwrap();
+        let doc = cargo_toml_str.parse::<toml_edit::Document>().unwrap();
+        println!("{cargo_toml_path:?} contents:\n{cargo_toml_str}");
+        assert!(
+            doc.get("workspace")
+                .unwrap()
+                .get("dependencies")
+                .unwrap()
+                .get("soroban-sdk")
+                .is_some(),
+            "expected [workspace.dependencies] to include soroban-sdk"
+        );
     }
 
     fn assert_contract_cargo_file_is_well_formed(project_dir: &Path, contract_name: &str) {
