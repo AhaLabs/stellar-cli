@@ -124,8 +124,10 @@ impl Location {
 impl Args {
     pub fn config_dir(&self) -> Result<PathBuf, Error> {
         if self.global {
+            eprintln!("global selected");
             global_config_path()
         } else {
+            eprintln!("local selected");
             self.local_config()
         }
     }
@@ -139,6 +141,7 @@ impl Args {
 
     pub fn local_config(&self) -> Result<PathBuf, Error> {
         let pwd = self.current_dir()?;
+        eprintln!("local pwd is {:?}", pwd);
         Ok(find_config_dir(pwd.clone()).unwrap_or_else(|_| pwd.join(".soroban")))
     }
 
