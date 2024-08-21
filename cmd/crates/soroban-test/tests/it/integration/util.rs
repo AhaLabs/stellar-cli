@@ -87,10 +87,60 @@ pub async fn extend_contract(sandbox: &TestEnv, id: &str) {
     extend(sandbox, id, None).await;
 }
 
+pub async fn extend_contract_with_wasm(sandbox: &TestEnv, wasm_path: &str) {
+    extend_with_wasm(sandbox, wasm_path, None).await;
+}
+
+pub async fn extend_contract_with_wasm_hash(sandbox: &TestEnv, wasm_hash: &str) {
+    extend_with_wasm_hash(sandbox, wasm_hash, None).await;
+}
+
 pub async fn extend(sandbox: &TestEnv, id: &str, value: Option<&str>) {
     let mut args = vec![
         "--id",
         id,
+        "--durability",
+        "persistent",
+        "--ledgers-to-extend",
+        "100000",
+    ];
+    if let Some(value) = value {
+        args.push("--key");
+        args.push(value);
+    }
+    sandbox
+        .new_assert_cmd("contract")
+        .arg("extend")
+        .args(args)
+        .assert()
+        .success();
+}
+
+pub async fn extend_with_wasm(sandbox: &TestEnv, wasm_path: &str, value: Option<&str>) {
+    let mut args = vec![
+        "--wasm",
+        wasm_path,
+        "--durability",
+        "persistent",
+        "--ledgers-to-extend",
+        "100000",
+    ];
+    if let Some(value) = value {
+        args.push("--key");
+        args.push(value);
+    }
+    sandbox
+        .new_assert_cmd("contract")
+        .arg("extend")
+        .args(args)
+        .assert()
+        .success();
+}
+
+pub async fn extend_with_wasm_hash(sandbox: &TestEnv, wasm_hash: &str, value: Option<&str>) {
+    let mut args = vec![
+        "--wasm-hash",
+        wasm_hash,
         "--durability",
         "persistent",
         "--ledgers-to-extend",

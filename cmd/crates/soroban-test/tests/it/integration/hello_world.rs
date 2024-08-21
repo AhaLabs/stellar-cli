@@ -9,7 +9,9 @@ use soroban_cli::{
 use soroban_rpc::GetLatestLedgerResponse;
 use soroban_test::{AssertExt, TestEnv, LOCAL_NETWORK_PASSPHRASE};
 
-use crate::integration::util::extend_contract;
+use crate::integration::util::{
+    extend_contract, extend_contract_with_wasm, extend_contract_with_wasm_hash,
+};
 
 use super::util::{deploy_hello, extend, HELLO_WORLD};
 
@@ -74,7 +76,11 @@ async fn invoke() {
         panic!("Expected seed phrase")
     };
     let id = &deploy_hello(sandbox).await;
+    let wasm_path = HELLO_WORLD.path();
+    let wasm_hash = HELLO_WORLD.hash().expect("hash should exist").to_string();
     extend_contract(sandbox, id).await;
+    extend_contract_with_wasm(sandbox, wasm_path.to_str().expect("path should exist")).await;
+    extend_contract_with_wasm_hash(sandbox, &wasm_hash).await;
     let uid = sandbox
         .new_assert_cmd("cache")
         .arg("actionlog")
