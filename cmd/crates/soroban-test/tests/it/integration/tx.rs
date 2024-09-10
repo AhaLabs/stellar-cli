@@ -76,9 +76,13 @@ async fn send() {
 }
 
 async fn send_manually(sandbox: &TestEnv, tx_env: &TransactionEnvelope) -> String {
-    let client = soroban_rpc::Client::new(&sandbox.rpc_url).unwrap();
-    let res = client.send_transaction_polling(tx_env).await.unwrap();
-    serde_json::to_string_pretty(&res).unwrap()
+    sandbox
+        .new_assert_cmd("tx")
+        .arg("send")
+        .write_stdin(tx_env.to_xdr_base64(Limits::none()).unwrap())
+        .assert()
+        .success()
+        .stdout_as_str()
 }
 
 fn sign_manually(sandbox: &TestEnv, tx_env: &TransactionEnvelope) -> TransactionEnvelope {
