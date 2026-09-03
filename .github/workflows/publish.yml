@@ -1,8 +1,11 @@
 name: Publish
 
+# Disabled on the theahaco fork: the `stellar-cli`/`soroban-cli` crate names are
+# owned by stellar on crates.io, so a publish would fail. Releases here ship
+# prebuilt binaries via binaries.yml (cargo-binstall), not crates.io. Left as a
+# manual trigger rather than deleted so it can be re-enabled if ever needed.
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
 
 defaults:
   run:
