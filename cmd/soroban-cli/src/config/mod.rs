@@ -150,20 +150,84 @@ impl Args {
         tx: &Transaction,
         signers: &[Signer],
         print: &Print,
-    ) -> Result<Option<Transaction>, Error> {
+    ) -> Result<Option<signer::SignedAuthTxn>, Error> {
         let network = self.get_network()?;
         let client = network.rpc_client()?;
         let latest_ledger = client.get_latest_ledger().await?.sequence;
         let seq_num = latest_ledger + 60; // ~ 5 min
+        let smart_accounts = self.discover_smart_accounts(tx, &client, print).await?;
         Ok(signer::sign_soroban_authorizations(
             tx,
             signers,
+            &smart_accounts,
             seq_num,
             &network.network_passphrase,
             self.sign_with.auto_sign,
             print,
         )
         .await?)
+    }
+
+    /// Discover one [`signer::smart_account::SmartAccountAuth`] per distinct
+    /// contract-address (`C…`) credential in `tx` — the auth entries authored by
+    /// an OpenZeppelin smart account. Each is resolved from the account's own
+    /// on-chain context rules, keyed only on the account address and the
+    /// `--sign-with-key` delegate; the signer module then matches and signs them.
+    async fn discover_smart_accounts(
+        &self,
+        tx: &Transaction,
+        client: &soroban_rpc::Client,
+        print: &Print,
+    ) -> Result<Vec<signer::smart_account::SmartAccountAuth>, Error> {
+        let [xdr::Operation {
+            body: xdr::OperationBody::InvokeHostFunction(body),
+            ..
+        }] = tx.operations.as_slice()
+        else {
+            return Ok(vec![]);
+        };
+        let mut out = Vec::new();
+        let mut seen: Vec<xdr::ScAddress> = Vec::new();
+        for auth in body.auth.as_slice() {
+            let addr = match &auth.credentials {
+                xdr::SorobanCredentials::Address(c) | xdr::SorobanCredentials::AddressV2(c) => {
+                    &c.address
+                }
+                _ => continue,
+            };
+            if !matches!(addr, xdr::ScAddress::Contract(_)) || seen.contains(addr) {
+                continue;
+            }
+            seen.push(addr.clone());
+            let delegate = self.delegate_signer(print)?;
+            out.push(
+                signer::smart_account::SmartAccountAuth::discover(
+                    client,
+                    addr.clone(),
+                    &auth.root_invocation,
+                    delegate,
+                )
+                .await?,
+            );
+        }
+        Ok(out)
+    }
+
+    /// Build the smart-account delegate signing key from `--sign-with-key`
+    /// (falling back to the source-account identity), reusing sign_with's
+    /// resolution — no smart-account-specific flag.
+    fn delegate_signer(&self, print: &Print) -> Result<Signer, Error> {
+        let key_or_name = match self.sign_with.sign_with_key.as_deref() {
+            Some(k) => k,
+            None => match &self.source_account {
+                UnresolvedMuxedAccount::AliasOrSecret(s) => s.as_str(),
+                _ => return Err(Error::SignWith(sign_with::Error::NoSignWithKey)),
+            },
+        };
+        let secret = self
+            .locator
+            .get_secret_key_with_hd_path(key_or_name, self.hd_path())?;
+        Ok(secret.signer(self.hd_path(), print.clone())?)
     }
 
     pub fn get_network(&self) -> Result<Network, Error> {
