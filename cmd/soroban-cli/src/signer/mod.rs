@@ -24,6 +24,7 @@ pub mod validation;
 #[cfg(feature = "additional-libs")]
 mod keyring;
 pub mod secure_store;
+pub mod smart_account;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -62,6 +63,21 @@ pub enum Error {
     Decode(#[from] stellar_strkey::DecodeError),
     #[error(transparent)]
     Validation(#[from] validation::Error),
+    #[error(transparent)]
+    Rpc(#[from] soroban_rpc::Error),
+    #[error("smart-account rule discovery failed calling {func}: {reason}")]
+    SmartAccountDiscovery { func: String, reason: String },
+    #[error("no context rule on smart account {account} authorizes the signing key")]
+    SmartAccountRuleNotFound { account: String },
+}
+
+/// The result of signing a transaction's Soroban auth entries: the updated
+/// transaction, plus whether any smart-account (custom `__check_auth`) entry was
+/// signed. The caller uses that flag to add an enforce-mode re-simulation so the
+/// account's verifier + policy footprint is reflected in the fee.
+pub struct SignedAuthTxn {
+    pub tx: Transaction,
+    pub smart_account_signed: bool,
 }
 
 /// Sign all SorobanAuthorizationEntry's in the transaction with the given signers. Returns a new
@@ -75,11 +91,12 @@ pub enum Error {
 pub async fn sign_soroban_authorizations(
     raw: &Transaction,
     signers: &[Signer],
+    smart_accounts: &[smart_account::SmartAccountAuth],
     signature_expiration_ledger: u32,
     network_passphrase: &str,
     skip_approval: bool,
     print: &Print,
-) -> Result<Option<Transaction>, Error> {
+) -> Result<Option<SignedAuthTxn>, Error> {
     // Check if we have exactly one operation and it's InvokeHostFunction
     let [op @ Operation {
         body: OperationBody::InvokeHostFunction(body),
@@ -93,6 +110,7 @@ pub async fn sign_soroban_authorizations(
     let source_bytes = muxed_account_bytes(&raw.source_account);
 
     let mut auths_modified = false;
+    let mut smart_account_signed = false;
     let mut signed_auths = Vec::with_capacity(body.auth.len());
     for raw_auth in body.auth.as_slice() {
         let credentials = match &raw_auth.credentials {
@@ -135,14 +153,29 @@ pub async fn sign_soroban_authorizations(
             ScAddress::LiquidityPool(_) => todo!("liquidity pool not supported"),
             ScAddress::Account(AccountId(PublicKey::PublicKeyTypeEd25519(Uint256(ref a)))) => a,
             ScAddress::Contract(stellar_xdr::ContractId(Hash(c))) => {
-                // This address is for a contract. This means we're using a custom
-                // smart-contract account. Currently the CLI doesn't support that yet.
-                return Err(Error::MissingSignerForAddress {
-                    address: format!(
-                        "{}",
-                        stellar_strkey::Strkey::Contract(stellar_strkey::Contract(*c))
-                    ),
-                });
+                // A custom smart-contract account. Its __check_auth wants an
+                // application-defined signature; `config` discovered the account's
+                // context rule and built a `SmartAccountAuth` for it. Sign via
+                // that (skipping the G-account signer path below) or error.
+                match smart_accounts.iter().find(|sa| &sa.account == address) {
+                    Some(sa) => {
+                        let signed = sa
+                            .sign(raw_auth, signature_expiration_ledger, &network_id)
+                            .await?;
+                        signed_auths.push(signed);
+                        auths_modified = true;
+                        smart_account_signed = true;
+                        continue;
+                    }
+                    None => {
+                        return Err(Error::MissingSignerForAddress {
+                            address: format!(
+                                "{}",
+                                stellar_strkey::Strkey::Contract(stellar_strkey::Contract(*c))
+                            ),
+                        })
+                    }
+                }
             }
         };
 
@@ -201,7 +234,10 @@ pub async fn sign_soroban_authorizations(
         body: OperationBody::InvokeHostFunction(new_body),
     }]
     .try_into()?;
-    Ok(Some(tx))
+    Ok(Some(SignedAuthTxn {
+        tx,
+        smart_account_signed,
+    }))
 }
 
 /// Handle a non-strict auth entry. Under `--auto-sign` (`skip_approval`), log
@@ -617,6 +653,7 @@ mod tests {
         let signed_auth_tx = sign_soroban_authorizations(
             &tx,
             &[signer_unused, signer],
+            &[],
             EXPIRATION_LEDGER,
             NETWORK,
             false,
@@ -626,7 +663,7 @@ mod tests {
         .unwrap()
         .expect("signing modifies the transaction");
 
-        let OperationBody::InvokeHostFunction(body) = &signed_auth_tx.operations[0].body else {
+        let OperationBody::InvokeHostFunction(body) = &signed_auth_tx.tx.operations[0].body else {
             panic!("expected InvokeHostFunction");
         };
         let SorobanCredentials::Address(creds) = &body.auth[0].credentials else {
@@ -662,6 +699,7 @@ mod tests {
         let signed_auth_tx = sign_soroban_authorizations(
             &tx,
             &[signer],
+            &[],
             EXPIRATION_LEDGER,
             NETWORK,
             true,
@@ -671,7 +709,7 @@ mod tests {
         .unwrap()
         .expect("signing modifies the transaction");
 
-        let OperationBody::InvokeHostFunction(body) = &signed_auth_tx.operations[0].body else {
+        let OperationBody::InvokeHostFunction(body) = &signed_auth_tx.tx.operations[0].body else {
             panic!("expected InvokeHostFunction");
         };
         let SorobanCredentials::Address(creds) = &body.auth[0].credentials else {
@@ -694,6 +732,7 @@ mod tests {
         let result = sign_soroban_authorizations(
             &tx,
             &[signer],
+            &[],
             EXPIRATION_LEDGER,
             NETWORK,
             false,
@@ -717,6 +756,7 @@ mod tests {
         let result = sign_soroban_authorizations(
             &tx,
             &[signer],
+            &[],
             EXPIRATION_LEDGER,
             NETWORK,
             false,
@@ -738,6 +778,7 @@ mod tests {
 
         let result = sign_soroban_authorizations(
             &tx,
+            &[],
             &[],
             EXPIRATION_LEDGER,
             NETWORK,
@@ -828,6 +869,7 @@ mod tests {
         let signed_auth_tx = sign_soroban_authorizations(
             &tx,
             &[signer],
+            &[],
             EXPIRATION_LEDGER,
             NETWORK,
             false,
@@ -837,7 +879,7 @@ mod tests {
         .unwrap()
         .expect("signing modifies the transaction");
 
-        let OperationBody::InvokeHostFunction(body) = &signed_auth_tx.operations[0].body else {
+        let OperationBody::InvokeHostFunction(body) = &signed_auth_tx.tx.operations[0].body else {
             panic!("expected InvokeHostFunction");
         };
         // The variant must be preserved as AddressV2 (not downgraded to V1).
@@ -896,6 +938,7 @@ mod tests {
         let v1_signed = sign_soroban_authorizations(
             &v1_tx,
             &[local_signer([1u8; 32])],
+            &[],
             EXPIRATION_LEDGER,
             NETWORK,
             false,
@@ -907,6 +950,7 @@ mod tests {
         let v2_signed = sign_soroban_authorizations(
             &v2_tx,
             &[local_signer([1u8; 32])],
+            &[],
             EXPIRATION_LEDGER,
             NETWORK,
             false,
@@ -919,8 +963,8 @@ mod tests {
         // Same address/nonce/invocation, but V2 binds the address into the
         // payload, so the resulting signatures must differ.
         assert_ne!(
-            first_address_creds(&v1_signed).signature,
-            first_address_creds(&v2_signed).signature,
+            first_address_creds(&v1_signed.tx).signature,
+            first_address_creds(&v2_signed.tx).signature,
             "V2 must bind the address, producing a different signature than V1",
         );
     }

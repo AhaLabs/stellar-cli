@@ -72,18 +72,47 @@ where
 
     // Sign all auth entries. Each entry is validated against the transaction's
     // host function inside `sign_soroban_authorizations` before being signed.
-    if let Some(tx) = config
+    // Hoisted: a smart-account re-simulation below can change the fee-bump need.
+    let mut fee_bump_fee = assembled.fee_bump_fee();
+
+    let mut smart_account_signed = false;
+    if let Some(signed) = config
         .sign_soroban_authorizations(&txn, auth_signers, &print)
         .await?
     {
-        *txn = tx;
+        *txn = signed.tx;
+        smart_account_signed = signed.smart_account_signed;
+    }
+
+    // A smart-account auth entry is verified by the account's custom
+    // `__check_auth`, which recording-mode simulation does not execute — so the
+    // verifier + policy cross-call reads it performs are absent from the first
+    // footprint and the resource fee is underestimated. Now that the entry is
+    // signed, re-simulate in enforce mode (which runs `__check_auth` against the
+    // attached auth) to capture the true footprint before signing the envelope.
+    if smart_account_signed {
+        print.infoln("Re-simulating with signed smart-account auth…");
+        let re = simulate_and_assemble_transaction(
+            client,
+            txn.as_ref(),
+            resources.resource_config(),
+            resources.resource_fee,
+            Some(soroban_rpc::AuthMode::Enforce),
+        )
+        .await?;
+        let re = resources.apply_to_assembled_txn(re);
+        *txn = re.transaction().clone();
+        fee_bump_fee = re.fee_bump_fee();
+        if !no_cache {
+            data::write(re.sim_response().clone().into(), &network.rpc_uri()?)?;
+        }
     }
 
     let mut signed_tx = config.sign(*txn, quiet).await?;
 
     // If the simulation detected the need for a fee bump,
     // wrap the transaction in a fee bump with the appropriate fee amount
-    if let Some(fee_bump_fee) = assembled.fee_bump_fee() {
+    if let Some(fee_bump_fee) = fee_bump_fee {
         print.warnln(format!(
             "Wrapping transaction with a fee bump transaction due to a fee of {} XLM.",
             print::format_number(fee_bump_fee, 7)
